@@ -642,6 +642,25 @@ void setupWebServer() {
     html += "  };\n";
     html += "  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n";
     html += "}\n";
+    html += "function showUpdateVolumeBox() {\n";
+    html += "  document.getElementById('update-volume-row').style.display = 'flex';\n";
+    html += "  document.getElementById('update-volume-btn-row').style.display = 'none';\n";
+    html += "}\n";
+    html += "function cancelUpdateVolume() {\n";
+    html += "  document.getElementById('update-volume-row').style.display = 'none';\n";
+    html += "  document.getElementById('update-volume-btn-row').style.display = 'inline';\n";
+    html += "}\n";
+    html += "function saveUpdateVolume(channel) {\n";
+    html += "  var newVol = document.getElementById('update-volume-input').value;\n";
+    html += "  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n";
+    html += "  var xhr = new XMLHttpRequest();\n";
+    html += "  xhr.open('POST', '/newUI/updateVolume', true);\n";
+    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    html += "  xhr.onreadystatechange = function() {\n";
+    html += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
+    html += "  };\n";
+    html += "  xhr.send('channel=' + channel + '&volume=' + encodeURIComponent(newVol));\n";
+    html += "}\n";
     html += "</script>\n";
     html += "</head><body>";
     html += generateHeader("Channel Management: " + channelName);
@@ -656,7 +675,13 @@ void setupWebServer() {
       html += "<p>Last Dosed: " + String(lastHour12) + ":" + (lastDispenseMinute < 10 ? "0" : "") + String(lastDispenseMinute) + " " + lastAmpm + "</p>";
     }
     html += "<p>Last Volume: " + String(lastDispensedVolume) + " ml</p>";
-    html += "<p>Remaining Volume: " + String(remainingML) + " ml (" + String((schedule.ml > 0 ? (int)(remainingML / schedule.ml) : 0)) + " Days)</p>";
+    html += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (" + String((schedule.ml > 0 ? (int)(remainingML / schedule.ml) : 0)) + " Days)</span> ";
+    html += "<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>";
+    html += "<span id='update-volume-row' class='rename-row' style='display:none;'>";
+    html += "<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='" + String(remainingML) + "'>";
+    html += "<button class='rename-btn' onclick='saveUpdateVolume(" + String(channel) + ")'>Save</button>";
+    html += "<button class='rename-btn cancel' onclick='cancelUpdateVolume()'>Cancel</button>";
+    html += "</span></p>";
     html += "</div>";
     // Schedule Card
     html += "<div class='card'>";
@@ -699,6 +724,23 @@ void setupWebServer() {
       }
       savePersistentDataToSPIFFS();
       server.send(200, "application/json", "{\"status\":\"renamed\"}");
+    } else {
+      server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+    }
+  });
+
+  // Add endpoint to handle update volume POST
+  server.on("/newUI/updateVolume", HTTP_POST, []() {
+    if (server.hasArg("channel") && server.hasArg("volume")) {
+      int channel = server.arg("channel").toInt();
+      float newVol = server.arg("volume").toFloat();
+      if (channel == 1) {
+        remainingMLChannel1 = newVol;
+      } else if (channel == 2) {
+        remainingMLChannel2 = newVol;
+      }
+      savePersistentDataToSPIFFS();
+      server.send(200, "application/json", "{\"status\":\"updated\"}");
     } else {
       server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
     }
