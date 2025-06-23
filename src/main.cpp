@@ -596,10 +596,92 @@ void setupWebServer() {
     html += "</div>";
     // System Time and Actions
     html += "<div class='card'>";
-    html += "<h2>System Time</h2>";
-    html += "<p>" + getFormattedTime() + "</p>";
     html += "<button onclick=\"location.href='/newUI/manualDose'\">Manual Dose</button>";
     html += "<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>";
+    html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>" + getFormattedTime() + "</span></div>";
+    html += "</div>";
+    html += generateFooter();
+    html += "</body></html>";
+    server.send(200, "text/html", html);
+  });
+
+  server.on("/newUI/manageChannel1", HTTP_GET, []() {
+    String html = "<html><head><title>Channel Management: " + channel1Name + "</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } </style></head><body>";
+    html += generateHeader("Channel Management: " + channel1Name);
+    // Status Card
+    html += "<div class='card'>";
+    html += "<h2>Status</h2>";
+    if (lastDispenseHour1 < 0 || lastDispenseMinute1 < 0) {
+      html += "<p>Last Dosed: N/A</p>";
+    } else {
+      int lastHour12 = lastDispenseHour1 % 12 == 0 ? 12 : lastDispenseHour1 % 12;
+      String lastAmpm = lastDispenseHour1 < 12 ? "AM" : "PM";
+      html += "<p>Last Dosed: " + String(lastHour12) + ":" + (lastDispenseMinute1 < 10 ? "0" : "") + String(lastDispenseMinute1) + " " + lastAmpm + "</p>";
+    }
+    html += "<p>Last Volume: " + String(lastDispensedVolume1) + " ml</p>";
+    html += "<p>Remaining Volume: " + String(remainingMLChannel1) + " ml (" + String((channel1Schedule.ml > 0 ? (int)(remainingMLChannel1 / channel1Schedule.ml) : 0)) + " Days)</p>";
+    html += "</div>";
+    // Schedule Card
+    html += "<div class='card'>";
+    html += "<h2>Schedule</h2>";
+    if (channel1Schedule.hour < 0 || channel1Schedule.minute < 0) {
+      html += "<p>Next Dose: N/A</p>";
+    } else {
+      int schedHour12 = channel1Schedule.hour % 12 == 0 ? 12 : channel1Schedule.hour % 12;
+      String schedAmpm = channel1Schedule.hour < 12 ? "AM" : "PM";
+      html += "<p>Next Dose: " + String(schedHour12) + ":" + (channel1Schedule.minute < 10 ? "0" : "") + String(channel1Schedule.minute) + " " + schedAmpm + "</p>";
+    }
+    html += "<p>Next Dose Volume: " + String(channel1Schedule.ml) + " ml</p>";
+    html += "<button onclick=\"location.href='/daily'\">Manage Schedule</button>";
+
+    html += "</div>";
+    html += "<div class='card'>";
+    html += "<button onclick=\"location.href='/prime?channel=1'\">Prime Pump</button>";
+    html += "<button onclick=\"location.href='/calibrate'\">Calibrate</button>";
+    html += "<button onclick=\"location.href='/names'\">Rename</button>";
+    html += "</div>";
+    html += generateFooter();
+    html += "</body></html>";
+    server.send(200, "text/html", html);
+  });
+
+  server.on("/newUI/manageChannel2", HTTP_GET, []() {
+    String html = "<html><head><title>Channel Management: " + channel2Name + "</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } </style></head><body>";
+    html += generateHeader("Channel Management: " + channel2Name );
+    // Status Card
+    html += "<div class='card'>";
+    html += "<h2>Status</h2>";
+    if (lastDispenseHour2 < 0 || lastDispenseMinute2 < 0) {
+      html += "<p>Last Dosed: N/A</p>";
+    } else {
+      int lastHour12 = lastDispenseHour2 % 12 == 0 ? 12 : lastDispenseHour2 % 12;
+      String lastAmpm = lastDispenseHour2 < 12 ? "AM" : "PM";
+      html += "<p>Last Dosed: " + String(lastHour12) + ":" + (lastDispenseMinute2 < 10 ? "0" : "") + String(lastDispenseMinute2) + " " + lastAmpm + "</p>";
+    }
+    html += "<p>Last Volume: " + String(lastDispensedVolume2) + " ml</p>";
+    html += "<p>Remaining Volume: " + String(remainingMLChannel2) + " ml (" + String((channel2Schedule.ml > 0 ? (int)(remainingMLChannel2 / channel2Schedule.ml) : 0)) + " Days)</p>";
+    html += "</div>";
+    // Schedule Card
+    html += "<div class='card'>";
+    html += "<h2>Schedule</h2>";
+    if (channel2Schedule.hour < 0 || channel2Schedule.minute < 0) {
+      html += "<p>Next Dose: N/A</p>";
+    } else {
+      int schedHour12 = channel2Schedule.hour % 12 == 0 ? 12 : channel2Schedule.hour % 12;
+      String schedAmpm = channel2Schedule.hour < 12 ? "AM" : "PM";
+      html += "<p>Next Dose: " + String(schedHour12) + ":" + (channel2Schedule.minute < 10 ? "0" : "") + String(channel2Schedule.minute) + " " + schedAmpm + "</p>";
+    }
+    html += "<p>Next Dose Volume: " + String(channel2Schedule.ml) + " ml</p>";
+    html += "<button onclick=\"location.href='/daily'\">Manage Schedule</button>";
+    html += "</div>";
+    html += "<div class='card'>";
+    html += "<button onclick=\"location.href='/prime?channel=2'\">Prime Pump</button>";
+    html += "<button onclick=\"location.href='/calibrate'\">Calibrate</button>";
+    html += "<button onclick=\"location.href='/names'\">Rename</button>";
     html += "</div>";
     html += generateFooter();
     html += "</body></html>";

@@ -4,3 +4,5 @@ Instructions for code generation
 3. UI should be rendered in mobile friendly manner
 4. do not send a lot of HTML data in one go, break into pieces
 5. USE card layout to group logical group of UI elements
+6. Maintain same UI theme for all pages
+7. Use common header footers across pages
