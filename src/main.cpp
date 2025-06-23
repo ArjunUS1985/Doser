@@ -62,6 +62,9 @@ void updateLEDState();
 void setLEDState(LEDState state);
 void updateLED(uint32_t color);
 void handlePrimePump();
+// Function declarations for header and footer generators
+String generateHeader(String title);
+String generateFooter();
 
 // Global Variables for LED
 LEDState currentLEDState = LED_OFF;
@@ -571,18 +574,8 @@ void setupWebServer() {
   server.on("/newUI/summary", HTTP_GET, []() {
     String html = "<html><head><title>Dosing Summary</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>";
-    html += "body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }";
-    html += "h1 { text-align: center; color: #444; }";
-    html += ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }";
-    html += ".card h2 { margin-top: 0; color: #007BFF; }";
-    html += ".card p { margin: 10px 0; }";
-    html += ".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; }";
-    html += ".card button:hover { background-color: #0056b3; }";
-    html += "</style></head><body>";
-
-    html += "<h1>Dosing Summary</h1>";
-
+    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; }</style></head><body>";
+    html += generateHeader("Dosing Summary");
     // Channel 1 Summary
     html += "<div class='card'>";
     html += "<h2>" + channel1Name + "</h2>";
@@ -592,7 +585,6 @@ void setupWebServer() {
     html += "<p>Days Remaining: " + String(remainingMLChannel1 / channel1Schedule.ml) + "</p>";
     html += "<button onclick=\"location.href='/newUI/manageChannel1'\">Manage Channel 1</button>";
     html += "</div>";
-
     // Channel 2 Summary
     html += "<div class='card'>";
     html += "<h2>" + channel2Name + "</h2>";
@@ -602,7 +594,6 @@ void setupWebServer() {
     html += "<p>Days Remaining: " + String(remainingMLChannel2 / channel2Schedule.ml) + "</p>";
     html += "<button onclick=\"location.href='/newUI/manageChannel2'\">Manage Channel 2</button>";
     html += "</div>";
-
     // System Time and Actions
     html += "<div class='card'>";
     html += "<h2>System Time</h2>";
@@ -610,7 +601,7 @@ void setupWebServer() {
     html += "<button onclick=\"location.href='/newUI/manualDose'\">Manual Dose</button>";
     html += "<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>";
     html += "</div>";
-
+    html += generateFooter();
     html += "</body></html>";
     server.send(200, "text/html", html);
   });
@@ -1131,5 +1122,20 @@ void handlePrimePump() {
   } else {
     server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
   }
+}
+
+// Common header and footer generators
+String generateHeader(String title) {
+  String html = "<div style='width:100%;background:#007BFF;color:#fff;padding:16px 0;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);margin-bottom:10px;'>";
+  html += title;
+  html += "</div>";
+  return html;
+}
+
+String generateFooter() {
+  String html = "<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>";
+  html += "S/W version : 1.0  Support : mymail.arjun@gmail.com";
+  html += "</div>";
+  return html;
 }
 
