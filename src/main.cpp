@@ -2,15 +2,14 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
-#include <FS.h>
 #include <Ticker.h>
 #include <NTPClient.h>
-#include <WiFiUdp.h>
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
 #include <WiFiManager.h>
 #include <Adafruit_NeoPixel.h>
 #include <LittleFS.h>
+#include <ESP8266mDNS.h> // Include mDNS library
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
 
 // Global variables that getFormattedTime needs
@@ -140,7 +139,7 @@ void handleCalibration();
 void handleManualDispense();
 void handleDailyDispense();
 void updateLED(uint32_t color);
-void calibrateMotor(int channel, float &calibrationFactor);
+//void calibrateMotor(int channel, float &calibrationFactor);
 void setupTimeSync();
 void checkDailyDispense();
 void loadPersistentDataFromSPIFFS();
@@ -203,6 +202,13 @@ void setup() {
 
   // Initialize OTA
   setupOTA();
+
+  // Initialize mDNS
+  if (MDNS.begin("doser")) { // Replace "doser" with your desired hostname
+    Serial.println("mDNS responder started");
+  } else {
+    Serial.println("Error setting up mDNS responder!");
+  }
 
   // Set LED to Green at the end of setup
   updateLED(LED_GREEN);
@@ -610,19 +616,7 @@ void handleCalibration() {
   server.send(400, "application/json", "{\"error\":\"missing or invalid parameters\"}");
 }
 
-void calibrateMotor(int channel, float &calibrationFactor) {
-  // Run motor for exactly 2 seconds
-  runMotor(channel, 2000);
 
-  // Simulate user input for calibration
-  float dispensedML = 5.0;  // Example value, replace with actual user input
-  
-  // Calculate milliseconds needed per mL (2000ms produced dispensedML)
-  calibrationFactor = 2000.0 / dispensedML;  // This gives us ms/mL directly
-
-  // Save calibration factor
-  savePersistentDataToSPIFFS();
-}
 
 void handleManualDispense() {
   if (server.hasArg("channel") && server.hasArg("ml")) {
