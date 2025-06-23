@@ -621,7 +621,29 @@ void setupWebServer() {
     
     String html = "<html><head><title>Channel Management: " + channelName + "</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } </style></head><body>";
+    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } .rename-input { flex:1; padding:8px; font-size:1em; border-radius:4px; border:1px solid #ccc; } .rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } .rename-btn.cancel { background:#aaa; } </style>";
+    html += "<script>\n";
+    html += "function showRenameBox() {\n";
+    html += "  document.getElementById('rename-row').style.display = 'flex';\n";
+    html += "  document.getElementById('rename-btn-row').style.display = 'none';\n";
+    html += "}\n";
+    html += "function cancelRename() {\n";
+    html += "  document.getElementById('rename-row').style.display = 'none';\n";
+    html += "  document.getElementById('rename-btn-row').style.display = 'block';\n";
+    html += "}\n";
+    html += "function saveRename(channel) {\n";
+    html += "  var newName = document.getElementById('rename-input').value;\n";
+    html += "  if (!newName) { alert('Name cannot be empty'); return; }\n";
+    html += "  var xhr = new XMLHttpRequest();\n";
+    html += "  xhr.open('POST', '/newUI/renameChannel', true);\n";
+    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    html += "  xhr.onreadystatechange = function() {\n";
+    html += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
+    html += "  };\n";
+    html += "  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n";
+    html += "}\n";
+    html += "</script>\n";
+    html += "</head><body>";
     html += generateHeader("Channel Management: " + channelName);
     // Status Card
     html += "<div class='card'>";
@@ -652,11 +674,34 @@ void setupWebServer() {
     html += "<div class='card'>";
     html += "<button onclick=\"location.href='/prime?channel=" + String(channel) + "'\">Prime Pump</button>";
     html += "<button onclick=\"location.href='/calibrate'\">Calibrate</button>";
-    html += "<button onclick=\"location.href='/names'\">Rename</button>";
+    // Rename UI
+    html += "<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>";
+    html += "<div id='rename-row' class='rename-row' style='display:none;'>";
+    html += "<input id='rename-input' class='rename-input' type='text' value='" + channelName + "'>";
+    html += "<button class='rename-btn' onclick='saveRename(" + String(channel) + ")'>Save</button>";
+    html += "<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>";
+    html += "</div>";
     html += "</div>";
     html += generateFooter();
     html += "</body></html>";
     server.send(200, "text/html", html);
+  });
+
+  // Add endpoint to handle rename POST
+  server.on("/newUI/renameChannel", HTTP_POST, []() {
+    if (server.hasArg("channel") && server.hasArg("name")) {
+      int channel = server.arg("channel").toInt();
+      String newName = server.arg("name");
+      if (channel == 1) {
+        channel1Name = newName;
+      } else if (channel == 2) {
+        channel2Name = newName;
+      }
+      savePersistentDataToSPIFFS();
+      server.send(200, "application/json", "{\"status\":\"renamed\"}");
+    } else {
+      server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+    }
   });
 
   server.begin();
