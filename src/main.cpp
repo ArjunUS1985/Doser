@@ -707,7 +707,13 @@ void setupWebServer() {
     html += "<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>";
     html += "</div>";
     html += "</div>";
+    // Add Back and Home buttons row (not on summary page)
+    html += "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>";
+    html +=   "<button style='flex:1;padding:12px 0;font-size:1.1em;background:#6c757d;color:#fff;border:none;border-radius:6px;' onclick='history.back()'>Back</button>";
+    html +=   "<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"location.href='/newUI/summary'\">Home</button>";
+    html += "</div>";
     html += generateFooter();
+    
     html += "</body></html>";
     server.send(200, "text/html", html);
   });
