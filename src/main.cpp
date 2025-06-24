@@ -161,6 +161,124 @@ void runMotor(int channel, int durationMs);
 void updateLEDState();
 String getFormattedTime(); 
 
+// --- Weekly Schedule Data Structure ---
+struct DaySchedule {
+  bool enabled;
+  int hour;
+  int minute;
+  float volume;
+};
+
+struct WeeklySchedule {
+  String channelName;
+  DaySchedule days[7]; // 0=Monday, 6=Sunday
+  bool missedDoseCompensation;
+};
+
+WeeklySchedule weeklySchedule1;
+WeeklySchedule weeklySchedule2;
+
+// --- Helper: Day names ---
+const char* dayNames[7] = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+
+// --- Save/Load Weekly Schedules ---
+void saveWeeklySchedulesToSPIFFS() {
+  File file = LittleFS.open("/weekly_schedules.json", "w");
+  if (!file) {
+    Serial.println("Failed to open weekly_schedules.json for writing");
+    return;
+  }
+  DynamicJsonDocument doc(2048);
+  // Channel 1
+  JsonObject ch1 = doc.createNestedObject("ch1");
+  ch1["channelName"] = weeklySchedule1.channelName;
+  ch1["missedDoseCompensation"] = weeklySchedule1.missedDoseCompensation;
+  JsonArray days1 = ch1.createNestedArray("days");
+  for (int i = 0; i < 7; ++i) {
+    JsonObject d = days1.createNestedObject();
+    d["enabled"] = weeklySchedule1.days[i].enabled;
+    d["hour"] = weeklySchedule1.days[i].hour;
+    d["minute"] = weeklySchedule1.days[i].minute;
+    d["volume"] = weeklySchedule1.days[i].volume;
+  }
+  // Channel 2
+  JsonObject ch2 = doc.createNestedObject("ch2");
+  ch2["channelName"] = weeklySchedule2.channelName;
+  ch2["missedDoseCompensation"] = weeklySchedule2.missedDoseCompensation;
+  JsonArray days2 = ch2.createNestedArray("days");
+  for (int i = 0; i < 7; ++i) {
+    JsonObject d = days2.createNestedObject();
+    d["enabled"] = weeklySchedule2.days[i].enabled;
+    d["hour"] = weeklySchedule2.days[i].hour;
+    d["minute"] = weeklySchedule2.days[i].minute;
+    d["volume"] = weeklySchedule2.days[i].volume;
+  }
+  serializeJson(doc, file);
+  file.close();
+}
+
+void loadWeeklySchedulesFromSPIFFS() {
+  File file = LittleFS.open("/weekly_schedules.json", "r");
+  if (!file) {
+    // Set defaults
+    weeklySchedule1.channelName = channel1Name;
+    weeklySchedule2.channelName = channel2Name;
+    for (int i = 0; i < 7; ++i) {
+      weeklySchedule1.days[i] = {false, 0, 0, 0.0f};
+      weeklySchedule2.days[i] = {false, 0, 0, 0.0f};
+    }
+    weeklySchedule1.missedDoseCompensation = false;
+    weeklySchedule2.missedDoseCompensation = false;
+    return;
+  }
+  DynamicJsonDocument doc(2048);
+  DeserializationError error = deserializeJson(doc, file);
+  if (error) {
+    file.close();
+    // Set defaults
+    weeklySchedule1.channelName = channel1Name;
+    weeklySchedule2.channelName = channel2Name;
+    for (int i = 0; i < 7; ++i) {
+      weeklySchedule1.days[i] = {false, 0, 0, 0.0f};
+      weeklySchedule2.days[i] = {false, 0, 0, 0.0f};
+    }
+    weeklySchedule1.missedDoseCompensation = false;
+    weeklySchedule2.missedDoseCompensation = false;
+    return;
+  }
+  // Channel 1
+  JsonObject ch1 = doc["ch1"];
+  weeklySchedule1.channelName = ch1["channelName"] | channel1Name;
+  weeklySchedule1.missedDoseCompensation = ch1["missedDoseCompensation"] | false;
+  JsonArray days1 = ch1["days"];
+  for (int i = 0; i < 7; ++i) {
+    if (i < days1.size()) {
+      weeklySchedule1.days[i].enabled = days1[i]["enabled"] | false;
+      weeklySchedule1.days[i].hour = days1[i]["hour"] | 0;
+      weeklySchedule1.days[i].minute = days1[i]["minute"] | 0;
+      weeklySchedule1.days[i].volume = days1[i]["volume"] | 0.0f;
+    } else {
+      weeklySchedule1.days[i] = {false, 0, 0, 0.0f};
+    }
+  }
+  // Channel 2
+  JsonObject ch2 = doc["ch2"];
+  weeklySchedule2.channelName = ch2["channelName"] | channel2Name;
+  weeklySchedule2.missedDoseCompensation = ch2["missedDoseCompensation"] | false;
+  JsonArray days2 = ch2["days"];
+  for (int i = 0; i < 7; ++i) {
+    if (i < days2.size()) {
+      weeklySchedule2.days[i].enabled = days2[i]["enabled"] | false;
+      weeklySchedule2.days[i].hour = days2[i]["hour"] | 0;
+      weeklySchedule2.days[i].minute = days2[i]["minute"] | 0;
+      weeklySchedule2.days[i].volume = days2[i]["volume"] | 0.0f;
+    } else {
+      weeklySchedule2.days[i] = {false, 0, 0, 0.0f};
+    }
+  }
+  file.close();
+}
+
 void setup() {
   // Initialize Serial
   Serial.begin(9600);
@@ -190,6 +308,7 @@ void setup() {
 
   // Load Persistent Data from SPIFFS
   loadPersistentDataFromSPIFFS();
+  loadWeeklySchedulesFromSPIFFS();
 
   // Setup WiFi
   setupWiFi();
@@ -577,21 +696,65 @@ void setupWebServer() {
     html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; }</style></head><body>";
     html += generateHeader("Dosing Summary");
     // Channel 1 Summary
+    int daysRemaining1 = 0;
+    float rem1 = remainingMLChannel1;
+    int dayIdx1 = (timeClient.getDay() + 6) % 7; // 0=Monday, 6=Sunday
+    int simulatedDays1 = 0;
+    for (int i = 0; i < 365; ++i) { // max 1 year
+      int d = (dayIdx1 + i) % 7;
+      if (weeklySchedule1.days[d].enabled) {
+        float dose = weeklySchedule1.days[d].volume;
+        if (rem1 < dose || dose <= 0.0f) break;
+        rem1 -= dose;
+        daysRemaining1++;
+      }
+      simulatedDays1++;
+    }
+    bool moreThanYear1 = false;
+    if (rem1 > 0.0f && simulatedDays1 == 365) {
+      daysRemaining1 = 366;
+      moreThanYear1 = true;
+    }
     html += "<div class='card'>";
     html += "<h2>" + channel1Name + "</h2>";
     html += "<p>Last Dosed Time: " + lastDispensedTime1 + "</p>";
     html += "<p>Last Volume: " + String(lastDispensedVolume1) + " ml</p>";
     html += "<p>Remaining Volume: " + String(remainingMLChannel1) + " ml</p>";
-    html += "<p>Days Remaining: " + String(remainingMLChannel1 / channel1Schedule.ml) + "</p>";
+    html += "<p>Days Remaining: ";
+    if (moreThanYear1) html += "More than a year";
+    else html += String(simulatedDays1);
+    html += "</p>";
     html += "<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>";
     html += "</div>";
     // Channel 2 Summary
+    int daysRemaining2 = 0;
+    float rem2 = remainingMLChannel2;
+    int dayIdx2 = (timeClient.getDay() + 6) % 7;
+    int simulatedDays2 = 0;
+    for (int i = 0; i < 365; ++i) {
+      int d = (dayIdx2 + i) % 7;
+      if (weeklySchedule2.days[d].enabled) {
+        float dose = weeklySchedule2.days[d].volume;
+        if (rem2 < dose || dose <= 0.0f) break;
+        rem2 -= dose;
+        daysRemaining2++;
+      }
+      simulatedDays2++;
+    }
+    bool moreThanYear2 = false;
+    if (rem2 > 0.0f && simulatedDays2 == 365) {
+      daysRemaining2 = 366;
+      moreThanYear2 = true;
+    }
     html += "<div class='card'>";
     html += "<h2>" + channel2Name + "</h2>";
     html += "<p>Last Dosed Time: " + lastDispensedTime2 + "</p>";
     html += "<p>Last Volume: " + String(lastDispensedVolume2) + " ml</p>";
     html += "<p>Remaining Volume: " + String(remainingMLChannel2) + " ml</p>";
-    html += "<p>Days Remaining: " + String(remainingMLChannel2 / channel2Schedule.ml) + "</p>";
+    html += "<p>Days Remaining: ";
+    if (moreThanYear2) html += "More than a year";
+    else html += String(simulatedDays2);
+    html += "</p>";
     html += "<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>";
     html += "</div>";
     // System Time and Actions
@@ -686,15 +849,41 @@ void setupWebServer() {
     // Schedule Card
     html += "<div class='card'>";
     html += "<h2>Schedule</h2>";
-    if (schedule.hour < 0 || schedule.minute < 0) {
-      html += "<p>Next Dose: N/A</p>";
-    } else {
-      int schedHour12 = schedule.hour % 12 == 0 ? 12 : schedule.hour % 12;
-      String schedAmpm = schedule.hour < 12 ? "AM" : "PM";
-      html += "<p>Next Dose: " + String(schedHour12) + ":" + (schedule.minute < 10 ? "0" : "") + String(schedule.minute) + " " + schedAmpm + "</p>";
+    // --- Show next dose from weekly schedule ---
+    int today = (timeClient.getDay() + 6) % 7; // 0=Monday, 6=Sunday
+    WeeklySchedule* ws = (channel == 1) ? &weeklySchedule1 : &weeklySchedule2;
+    int nowHour = timeClient.getHours();
+    int nowMinute = timeClient.getMinutes();
+    int nextDay = -1, nextHour = -1, nextMinute = -1;
+    float nextVol = 0.0f;
+    for (int offset = 0; offset < 7; ++offset) {
+      int d = (today + offset) % 7;
+      if (ws->days[d].enabled) {
+        if (offset == 0 && (ws->days[d].hour > nowHour || (ws->days[d].hour == nowHour && ws->days[d].minute > nowMinute))) {
+          nextDay = d;
+          nextHour = ws->days[d].hour;
+          nextMinute = ws->days[d].minute;
+          nextVol = ws->days[d].volume;
+          break;
+        } else if (offset > 0) {
+          nextDay = d;
+          nextHour = ws->days[d].hour;
+          nextMinute = ws->days[d].minute;
+          nextVol = ws->days[d].volume;
+          break;
+        }
+      }
     }
-    html += "<p>Next Dose Volume: " + String(schedule.ml) + " ml</p>";
-    html += "<button onclick=\"location.href='/daily'\">Manage Schedule</button>";
+    if (nextDay >= 0) {
+      String ampm = (nextHour < 12) ? "AM" : "PM";
+      int hour12 = nextHour % 12 == 0 ? 12 : nextHour % 12;
+      html += "<p>Next Dose: " + String(dayNames[nextDay]) + ", " + String(hour12) + ":" + (nextMinute < 10 ? "0" : "") + String(nextMinute) + " " + ampm + "</p>";
+      html += "<p>Next Dose Volume: " + String(nextVol) + " ml</p>";
+    } else {
+      html += "<p>Next Dose: N/A</p>";
+      html += "<p>Next Dose Volume: N/A</p>";
+    }
+    html += "<button onclick=\"location.href='/newUI/manageSchedule?channel=" + String(channel) + "'\">Manage Schedule</button>";
     html += "</div>";
     html += "<div class='card'>";
     html += "<button onclick=\"location.href='/prime?channel=" + String(channel) + "'\">Prime Pump</button>";
@@ -708,10 +897,7 @@ void setupWebServer() {
     html += "</div>";
     html += "</div>";
     // Add Back and Home buttons row (not on summary page)
-    html += "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>";
-    html +=   "<button style='flex:1;padding:12px 0;font-size:1.1em;background:#6c757d;color:#fff;border:none;border-radius:6px;' onclick='history.back()'>Back</button>";
-    html +=   "<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"location.href='/newUI/summary'\">Home</button>";
-    html += "</div>";
+    html += "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'><button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button></div>";
     html += generateFooter();
     
     html += "</body></html>";
@@ -750,6 +936,117 @@ void setupWebServer() {
     } else {
       server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
     }
+  });
+
+  // --- Manage Schedule UI ---
+  server.on("/newUI/manageSchedule", HTTP_GET, []() {
+    int channel = 1;
+    if (server.hasArg("channel")) channel = server.arg("channel").toInt();
+    WeeklySchedule* ws = (channel == 2) ? &weeklySchedule2 : &weeklySchedule1;
+    String html = "<html><head><title>Manage Schedule: " + ws->channelName + "</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;}</style>";
+    html += "<script>\n";
+    html += "function copyMondayToOthers() {\n";
+    html += "  var enabled=document.getElementById('enabled0').checked;\n";
+    html += "  var time=document.getElementById('time0').value;\n";
+    html += "  var vol=document.getElementById('vol0').value;\n";
+    html += "  for(var i=1;i<7;i++){\n";
+    html += "    document.getElementById('enabled'+i).checked=enabled;\n";
+    html += "    document.getElementById('time'+i).value=time;\n";
+    html += "    document.getElementById('vol'+i).value=vol;\n";
+    html += "    document.getElementById('enabled'+i).disabled=true;\n";
+    html += "    document.getElementById('time'+i).disabled=true;\n";
+    html += "    document.getElementById('vol'+i).disabled=true;\n";
+    html += "  }\n";
+    html += "}\n";
+    html += "function uncopyMonday() {\n";
+    html += "  for(var i=1;i<7;i++){\n";
+    html += "    document.getElementById('enabled'+i).disabled=false;\n";
+    html += "    document.getElementById('time'+i).disabled=false;\n";
+    html += "    document.getElementById('vol'+i).disabled=false;\n";
+    html += "  }\n";
+    html += "}\n";
+    html += "function onCopyChange(cb){if(cb.checked){copyMondayToOthers();}else{uncopyMonday();}}\n";
+    html += "window.addEventListener('DOMContentLoaded',function(){\n";
+    html += "  document.getElementById('enabled0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
+    html += "  document.getElementById('time0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
+    html += "  document.getElementById('vol0').addEventListener('input',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
+    html += "});\n";
+    html += "</script>\n";
+    html += "</head><body>";
+    html += generateHeader("Manage Schedule : " + ws->channelName);
+    html += "<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>";
+    html += "<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=" + String(channel) + "'>";
+    html += "<table style='width:100%;border-collapse:collapse;'>";
+    html += "<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>";
+    for (int i = 0; i < 7; ++i) {
+      String rowShade = (i % 2 == 0) ? "background:#f9f9f9;" : "background:#fff;";
+      html += "<tr style='" + rowShade + "'>";
+      html += "<td>" + String(dayNames[i]) + "</td>";
+      html += "<td><input type='checkbox' id='enabled" + String(i) + "' name='enabled" + String(i) + "'" + (ws->days[i].enabled ? " checked" : "") + "></td>";
+      char timebuf[6];
+      snprintf(timebuf, sizeof(timebuf), "%02d:%02d", ws->days[i].hour, ws->days[i].minute);
+      html += "<td><input type='time' id='time" + String(i) + "' name='time" + String(i) + "' value='" + String(timebuf) + "'></td>";
+      html += "<td><input type='number' id='vol" + String(i) + "' name='vol" + String(i) + "' step='0.01' min='0' value='" + String(ws->days[i].volume, 2) + "'></td>";
+      html += "</tr>";
+    }
+    html += "</table>";
+    html += "<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>";
+    html += String("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'") + (ws->missedDoseCompensation ? " checked" : "") + "><label for='missedDose'>Missed Dose Compensation</label></div>";
+    html += "<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>";
+    html += "<button type='submit' style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;'>Save</button>";
+    html += "<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;'>Cancel</button>";
+    html += "</div>";
+    html += "</form>";
+    html += "</div>";
+    html += generateFooter();
+    // Add script to enable all fields and copy Monday's values before submit if copyMonday is checked
+    html += "<script>\n";
+    html += "document.getElementById('scheduleForm').addEventListener('submit',function(e){\n";
+    html += "  if(document.getElementById('copyMonday').checked){\n";
+    html += "    var enabled=document.getElementById('enabled0').checked;\n";
+    html += "    var time=document.getElementById('time0').value;\n";
+    html += "    var vol=document.getElementById('vol0').value;\n";
+    html += "    for(var i=1;i<7;i++){\n";
+    html += "      document.getElementById('enabled'+i).disabled=false;\n";
+    html += "      document.getElementById('time'+i).disabled=false;\n";
+    html += "      document.getElementById('vol'+i).disabled=false;\n";
+    html += "      document.getElementById('enabled'+i).checked=enabled;\n";
+    html += "      document.getElementById('time'+i).value=time;\n";
+    html += "      document.getElementById('vol'+i).value=vol;\n";
+    html += "    }\n";
+    html += "  }\n";
+    html += "});\n";
+    html += "document.getElementById('cancelBtn').addEventListener('click',function(){\n";
+    html += "  var url = new URL(window.location.href);\n";
+    html += "  var channel = url.searchParams.get('channel') || '1';\n";
+    html += "  window.location.href = '/newUI/manageChannel?channel=' + channel;\n";
+    html += "});\n";
+    html += "</script>\n";
+    html += "</form></body></html>";
+    server.send(200, "text/html", html);
+  });
+  server.on("/newUI/manageSchedule", HTTP_POST, []() {
+    int channel = 1;
+    if (server.hasArg("channel")) channel = server.arg("channel").toInt();
+    WeeklySchedule* ws = (channel == 2) ? &weeklySchedule2 : &weeklySchedule1;
+    for (int i = 0; i < 7; ++i) {
+      ws->days[i].enabled = server.hasArg("enabled" + String(i));
+      String t = server.arg("time" + String(i));
+      int h = 0, m = 0;
+      if (t.length() == 5) {
+        h = t.substring(0,2).toInt();
+        m = t.substring(3,5).toInt();
+      }
+      ws->days[i].hour = h;
+      ws->days[i].minute = m;
+      ws->days[i].volume = server.arg("vol" + String(i)).toFloat();
+    }
+    ws->missedDoseCompensation = server.hasArg("missedDose");
+    saveWeeklySchedulesToSPIFFS();
+    server.sendHeader("Location", "/newUI/manageChannel?channel=" + String(channel));
+    server.send(302, "text/plain", "");
   });
 
   server.begin();
@@ -1264,7 +1561,8 @@ void handlePrimePump() {
       isPrimingChannel2 = state;
     }
     
-    server.send(200, "application/json", "{\"status\":\"prime pump " + String(state ? "started" : "stopped") + "\"}");
+    String msg = String("{\"status\":\"prime pump ") + (state ? "started" : "stopped") + "\"}";
+    server.send(200, "application/json", msg);
   } else {
     server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
   }
