@@ -828,6 +828,27 @@ void setupWebServer() {
     html += "</head><body>";
     html += generateHeader("Channel Management: " + channelName);
     // Status Card
+    // Calculate days remaining for this channel (same logic as summary)
+    int daysRemaining = 0;
+    float rem = remainingML;
+    int dayIdx = (timeClient.getDay() + 6) % 7;
+    int simulatedDays = 0;
+    WeeklySchedule* wsDays = (channel == 1) ? &weeklySchedule1 : &weeklySchedule2;
+    for (int i = 0; i < 365; ++i) {
+      int d = (dayIdx + i) % 7;
+      if (wsDays->days[d].enabled) {
+        float dose = wsDays->days[d].volume;
+        if (rem < dose || dose <= 0.0f) break;
+        rem -= dose;
+        daysRemaining++;
+      }
+      simulatedDays++;
+    }
+    bool moreThanYear = false;
+    if (rem > 0.0f && simulatedDays == 365) {
+      daysRemaining = 366;
+      moreThanYear = true;
+    }
     html += "<div class='card'>";
     html += "<h2>Status</h2>";
     if (lastDispenseHour < 0 || lastDispenseMinute < 0) {
@@ -838,7 +859,10 @@ void setupWebServer() {
       html += "<p>Last Dosed: " + String(lastHour12) + ":" + (lastDispenseMinute < 10 ? "0" : "") + String(lastDispenseMinute) + " " + lastAmpm + "</p>";
     }
     html += "<p>Last Volume: " + String(lastDispensedVolume) + " ml</p>";
-    html += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (" + String((schedule.ml > 0 ? (int)(remainingML / schedule.ml) : 0)) + " Days)</span> ";
+    html += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (";
+    if (moreThanYear) html += "More than a year";
+    else html += String(simulatedDays) + " days";
+    html += ")</span> ";
     html += "<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>";
     html += "<span id='update-volume-row' class='rename-row' style='display:none;'>";
     html += "<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='" + String(remainingML) + "'>";
