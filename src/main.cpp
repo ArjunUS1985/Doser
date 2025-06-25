@@ -426,24 +426,65 @@ void setupWebServer() {
   });
 
   server.on("/calibrate", HTTP_GET, []() {
-    String html = "<html><head><title>Calibrate</title></head><body>";
-    html += "<h1>Calibrate</h1>";
-    html += "<form action='/calibrate' method='POST'>";
-    html += "<label for='channel'>Channel:</label>";
-    html += "<select name='channel'>";
-    html += "<option value='1'>" + channel1Name + "</option>";
-    html += "<option value='2'>" + channel2Name + "</option>";
-    html += "</select><br><br>";
-    html += "<input type='submit' value='Calibrate'>";
+    int channel = 1;
+    if (server.hasArg("channel")) channel = server.arg("channel").toInt();
+    String channelName = (channel == 1) ? channel1Name : channel2Name;
+    String html = "<html><head><title>Calibrate</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} .calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .calib-btn:disabled{background:#aaa;cursor:not-allowed;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} #countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} </style>";
+    html += "<script>\n";
+    html += "function startCountdown() {\n";
+    html += "  var btn = document.getElementById('calibBtn');\n";
+    html += "  var homeBtn = document.getElementById('homeBtn');\n";
+    html += "  var backBtn = document.getElementById('backBtn');\n";
+    html += "  var countdown = document.getElementById('countdown');\n";
+    html += "  btn.disabled = true;\n";
+    html += "  homeBtn.disabled = true;\n";
+    html += "  backBtn.disabled = true;\n";
+    html += "  var timeLeft = 15;\n";
+    html += "  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
+    html += "  var interval = setInterval(function() {\n";
+    html += "    timeLeft--;\n";
+    html += "    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
+    html += "    if (timeLeft <= 0) {\n";
+    html += "      clearInterval(interval);\n";
+    html += "      countdown.innerText = '';\n";
+    html += "      btn.disabled = false;\n";
+    html += "      homeBtn.disabled = false;\n";
+    html += "      backBtn.disabled = false;\n";
+    html += "    }\n";
+    html += "  }, 1000);\n";
+    html += "}\n";
+    html += "function onSubmitCalib(e){\n";
+    html += "  startCountdown();\n";
+    html += "}\n";
+    html += "</script>";
+    html += "</head><body>";
+    html += generateHeader("Calibrate: " + channelName);
+    html += "<div class='card'>";
+  //  html += "<h2>Calibrate: " + channelName + "</h2>";
+    html += "<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>";
+    html += "<div id='countdown'></div>";
+    html += "<form action='/calibrate?channel=" + String(channel) + "' method='POST' onsubmit='onSubmitCalib(event)'>";
+    html += "<input type='hidden' name='channel' value='" + String(channel) + "'>";
+    html += "<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>";
     html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
+    html += "<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+    html += "<button class='back-btn' id='backBtn' onclick=\"history.back()\">Back</button>";
+    html += "</div>";
+    html += generateFooter();
     html += "</body></html>";
     server.send(200, "text/html", html);
   });
 
   server.on("/manual", HTTP_GET, []() {
-    String html = "<html><head><title>Manual Dispense</title></head><body>";
-    html += "<h1>Manual Dispense</h1>";
+    String html = "<html><head><title>Manual Dispense</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .dispense-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} </style>";
+    html += "</head><body>";
+    html += generateHeader("Manual Dispense");
+    html += "<div class='card'>";
+    html += "<h2>Manual Dispense</h2>";
     html += "<form action='/manual' method='POST'>";
     html += "<label for='channel'>Channel:</label>";
     html += "<select name='channel'>";
@@ -452,9 +493,12 @@ void setupWebServer() {
     html += "</select><br><br>";
     html += "<label for='ml'>Amount (ml):</label>";
     html += "<input type='number' name='ml' step='0.1'><br><br>";
-    html += "<input type='submit' value='Dispense'>";
+    html += "<button type='submit' class='dispense-btn'>Dispense</button>";
     html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
+    html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+    html += "<button class='back-btn' onclick=\"history.back()\">Back</button>";
+    html += "</div>";
+    html += generateFooter();
     html += "</body></html>";
     server.send(200, "text/html", html);
   });
@@ -623,7 +667,7 @@ void setupWebServer() {
     String html = "<html><head>";
     html += "<title>Prime Pump</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } .card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } .prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } .prime-btn.stop { background: #28a745; } .prime-btn:active { opacity: 0.9; } .home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } </style>";
+    html += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } .card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } .prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } .prime-btn.stop { background: #28a745; } .prime-btn:active { opacity: 0.9; } .home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } .back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } </style>";
     html += "<script>\n";
     html += "function togglePrime() {\n";
     html += "  var btn = document.getElementById('primeButton');\n";
@@ -649,6 +693,7 @@ void setupWebServer() {
     html += "<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>";
     html += "<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>";
     html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+    html += "<button class='back-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;' onclick=\"history.back()\">Back</button>";
     html += "</div>";
     html += generateFooter();
     html += "</body></html>";
@@ -922,7 +967,7 @@ void setupWebServer() {
     html += "</div>";
     html += "<div class='card'>";
     html += "<button onclick=\"location.href='/prime?channel=" + String(channel) + "'\">Prime Pump</button>";
-    html += "<button onclick=\"location.href='/calibrate'\">Calibrate</button>";
+    html += "<button onclick=\"location.href='/calibrate?channel=" + String(channel) + "'\">Calibrate</button>";
     // Rename UI
     html += "<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>";
     html += "<div id='rename-row' class='rename-row' style='display:none;'>";
@@ -1095,34 +1140,44 @@ void handleCalibration() {
     if (server.hasArg("dispensedML")) {
       float dispensedML = server.arg("dispensedML").toFloat();
       float &calibrationFactor = (channel == 1) ? calibrationFactor1 : calibrationFactor2;
-      
-      // Calculate milliseconds needed per mL (2000ms produced dispensedML)
-      calibrationFactor = 10000.0 / dispensedML;  // This gives us ms/mL directly
-      
-      // Save calibration factor
+      calibrationFactor = 15000.0 / dispensedML;
       savePersistentDataToSPIFFS();
-      
-      // Redirect back to home
-      server.sendHeader("Location", "/");
-      server.send(302, "text/plain", "");
+      // Show toast and redirect to channel management
+      String html = "<html><head><meta http-equiv='refresh' content='2;url=/newUI/manageChannel?channel=" + String(channel) + "'>";
+      html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+      html += "<style>.toast{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#28a745;color:#fff;padding:18px 32px;border-radius:8px;font-size:1.2em;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:9999;}</style>";
+      html += "</head><body>";
+      html += "<div class='toast'>Calibration complete!</div>";
+      html += "<script>setTimeout(function(){window.location.href='/newUI/manageChannel?channel=" + String(channel) + "';},1800);</script>";
+      html += "</body></html>";
+      server.send(200, "text/html", html);
       return;
     }
     
     // First phase - run the motor and show input form
     if (channel == 1 || channel == 2) {
-      // Run motor for exactly 2 seconds
-      runMotor(channel, 10000);
+      // Run motor for exactly 15 seconds
+      runMotor(channel, 15000);
       
       // Show form to input dispensed amount
-      String html = "<html><head><title>Calibration Measurement</title></head><body>";
-      html += "<h1>Calibration Measurement</h1>";
-      html += "<p>Motor has run for 2 seconds. Please measure the dispensed liquid and enter the amount below:</p>";
+      String html = "";
+      html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+      html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-label{font-size:1.1em;margin-bottom:8px;display:block;} .calib-input{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;margin-bottom:16px;} .calib-submit{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} </style>";
+      html += "</head><body>";
+      html += generateHeader("Calibration Measurement");
+      html += "<div class='card'>";
+     // html += "<h2>Calibration Measurement</h2>";
+      html += "<p style='margin-bottom:18px;'>Motor has run for 15 seconds. Please measure the dispensed liquid and enter the amount below:</p>";
       html += "<form action='/calibrate' method='POST'>";
       html += "<input type='hidden' name='channel' value='" + String(channel) + "'>";
-      html += "<label for='dispensedML'>Amount dispensed (ml):</label><br>";
-      html += "<input type='number' name='dispensedML' step='0.1' required><br><br>";
-      html += "<input type='submit' value='Submit Measurement'>";
+      html += "<label for='dispensedML' class='calib-label'>Amount dispensed (ml):</label>";
+      html += "<input type='number' name='dispensedML' step='0.1' required class='calib-input'><br>";
+      html += "<button type='submit' class='calib-submit'>Submit Measurement</button>";
       html += "</form>";
+      html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+      html += "<button class='back-btn' onclick=\"history.back()\">Back</button>";
+      html += "</div>";
+      html += generateFooter();
       html += "</body></html>";
       server.send(200, "text/html", html);
       return;
