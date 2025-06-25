@@ -115,15 +115,6 @@ DailySchedule channel2Schedule = {0, 0, 0.0};
 float remainingMLChannel1 = 0.0;
 float remainingMLChannel2 = 0.0;
 
-// MQTT Variables
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
-const char* mqttServer = "homeassistant.local"; // Example public broker
-const int mqttPort = 1883;
-const char* mqttTopicLastDosed = "doser/lastDosed";
-const char* mqttTopicRemainingML = "doser/remainingML";
-const char* mqttTopicManualDose = "doser/manualDose";
-
 // Add timezone offset to global variables
 int32_t timezoneOffset = 0;  // Default to UTC
 
@@ -156,11 +147,7 @@ void loadPersistentDataFromSPIFFS();
 void savePersistentDataToSPIFFS();
 void handleBottleTracking();
 void updateRemainingML(int channel, float dispensedML);
-void setupMQTT();
-void handleMQTTConnection();
-void mqttCallback(char* topic, byte* payload, unsigned int length);
-void publishLastDosed(int channel, float ml);
-void publishRemainingML();
+
 void handleSystemReset();
 void setupOTA();
 void blinkLED(uint32_t color, int times);
@@ -416,156 +403,197 @@ void setupWiFi() {
 }
 
 void setupWebServer() {
-  server.on("/", HTTP_GET, []() {
-    String html = "<html><head>";
-    html += "<title>Doser Control</title>";
-    html += "<meta http-equiv='refresh' content='5'>"; // Refresh page every 5 seconds
-    html += "</head><body>";
-    html += "<h1>Doser Control</h1>";
-    html += "<h2>Current Time: " + getFormattedTime() + "</h2>";
-    html += "<p><a href='/names'>Set Channel Names</a></p>";
-    html += "<p><a href='/calibrate'>Calibrate</a></p>";
-    html += "<p><a href='/manual'>Manual Dispense</a></p>";
-    html += "<p><a href='/daily'>Set Daily Schedule</a></p>";
-    html += "<p><a href='/bottle'>Set Bottle Capacity</a></p>";
-    html += "<p><a href='/prime'>Prime Pump</a></p>";  // Added Prime Pump link
-    html += "<p><a href='/timezone'>Set Timezone</a></p>";
-    html += "<p><a href='/view'>View Parameters</a></p>";
-    html += "<p><a href='/reset'>System Reset</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
+ // server.on("/", HTTP_GET, []() {
+ //   String html = "<html><head>";
+ //   html += "<title>Doser Control</title>";
+ //   html += "<meta http-equiv='refresh' content='5'>"; // Refresh page every 5 seconds
+ //   html += "</head><body>";
+ //   html += "<h1>Doser Control</h1>";
+ //   html += "<h2>Current Time: " + getFormattedTime() + "</h2>";
+ //   html += "<p><a href='/names'>Set Channel Names</a></p>";
+ //   html += "<p><a href='/calibrate'>Calibrate</a></p>";
+ //   html += "<p><a href='/manual'>Manual Dispense</a></p>";
+ //   html += "<p><a href='/daily'>Set Daily Schedule</a></p>";
+ //   html += "<p><a href='/bottle'>Set Bottle Capacity</a></p>";
+ //   html += "<p><a href='/prime'>Prime Pump</a></p>";  // Added Prime Pump link
+ //   html += "<p><a href='/timezone'>Set Timezone</a></p>";
+ //   html += "<p><a href='/view'>View Parameters</a></p>";
+ //   html += "<p><a href='/reset'>System Reset</a></p>";
+ //   html += "</body></html>";
+ //   server.send(200, "text/html", html);
+ // });
 
   server.on("/calibrate", HTTP_GET, []() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
     String channelName = (channel == 1) ? channel1Name : channel2Name;
-    String html = "<html><head><title>Calibrate</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} .calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .calib-btn:disabled{background:#aaa;cursor:not-allowed;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} #countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-    html += "<script>\n";
-    html += "function startCountdown() {\n";
-    html += "  var btn = document.getElementById('calibBtn');\n";
-    html += "  var homeBtn = document.getElementById('homeBtn');\n";
-    html += "  var backBtn = document.getElementById('backBtn');\n";
-    html += "  var countdown = document.getElementById('countdown');\n";
-    html += "  btn.disabled = true;\n";
-    html += "  homeBtn.disabled = true;\n";
-    html += "  backBtn.disabled = true;\n";
-    html += "  var timeLeft = 15;\n";
-    html += "  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
-    html += "  var interval = setInterval(function() {\n";
-    html += "    timeLeft--;\n";
-    html += "    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
-    html += "    if (timeLeft <= 0) {\n";
-    html += "      clearInterval(interval);\n";
-    html += "      countdown.innerText = '';\n";
-    html += "      btn.disabled = false;\n";
-    html += "      homeBtn.disabled = false;\n";
-    html += "      backBtn.disabled = false;\n";
-    html += "    }\n";
-    html += "  }, 1000);\n";
-    html += "}\n";
-    html += "function onSubmitCalib(e){\n";
-    html += "  startCountdown();\n";
-    html += "}\n";
-    html += "</script>";
-    html += "</head><body>";
-    html += generateHeader("Calibrate: " + channelName);
-    html += "<div class='card'>";
-  //  html += "<h2>Calibrate: " + channelName + "</h2>";
-    html += "<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>";
-    html += "<div id='countdown'></div>";
-    html += "<form action='/calibrate?channel=" + String(channel) + "' method='POST' onsubmit='onSubmitCalib(event)'>";
-    html += "<input type='hidden' name='channel' value='" + String(channel) + "'>";
-    html += "<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>";
-    html += "</form>";
-    html += "<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-    html += "<button class='back-btn' id='backBtn' onclick=\"history.back()\">Back</button>";
-    html += "</div>";
-    html += generateFooter();
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
-
-  server.on("/manual", HTTP_GET, []() {
-    String html = "<html><head><title>Manual Dispense</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .dispense-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-    html += "</head><body>";
-    html += generateHeader("Manual Dispense");
-    html += "<div class='card'>";
-    html += "<h2>Manual Dispense</h2>";
-    html += "<form action='/manual' method='POST'>";
-    html += "<label for='channel'>Channel:</label>";
-    html += "<select name='channel'>";
-    html += "<option value='1'>" + channel1Name + "</option>";
-    html += "<option value='2'>" + channel2Name + "</option>";
-    html += "</select><br><br>";
-    html += "<label for='ml'>Amount (ml):</label>";
-    html += "<input type='number' name='ml' step='0.1'><br><br>";
-    html += "<button type='submit' class='dispense-btn'>Dispense</button>";
-    html += "</form>";
-    html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-    html += "<button class='back-btn' onclick=\"history.back()\">Back</button>";
-    html += "</div>";
-    html += generateFooter();
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
-
-  server.on("/daily", HTTP_GET, []() {
-    String html = "<html><head><title>Set Daily Schedule</title></head><body>";
-    html += "<h1>Set Daily Schedule</h1>";
     
-    // Show current schedules
-    html += "<h2>Current Schedules:</h2>";
-    html += "<p>" + channel1Name + ": " + String(channel1Schedule.hour) + ":" + 
-            String(channel1Schedule.minute, 2) + " - " + String(channel1Schedule.ml) + "ml</p>";
-    html += "<p>" + channel2Name + ": " + String(channel2Schedule.hour) + ":" + 
-            String(channel2Schedule.minute, 2) + " - " + String(channel2Schedule.ml) + "ml</p>";
+    // Start chunked response
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
     
-    // Form to set new schedule
-    html += "<h2>Set New Schedule:</h2>";
-    html += "<form action='/daily' method='POST'>";
-    html += "<label for='channel'>Channel:</label>";
-    html += "<select name='channel'>";
-    html += "<option value='1'>" + channel1Name + "</option>";
-    html += "<option value='2'>" + channel2Name + "</option>";
-    html += "</select><br><br>";
-    html += "<label for='hour'>Hour:</label>";
-    html += "<input type='number' name='hour' min='0' max='23'><br><br>";
-    html += "<label for='minute'>Minute:</label>";
-    html += "<input type='number' name='minute' min='0' max='59'><br><br>";
-    html += "<label for='ml'>Amount (ml):</label>";
-    html += "<input type='number' name='ml' step='0.1'><br><br>";
-    html += "<input type='submit' value='Set Schedule'>";
-    html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
+    // Send HTML header
+    String chunk = "<html><head><title>Calibrate</title>";
+    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ";
+    server.sendContent(chunk);
+    
+    // Send CSS in smaller chunks
+    chunk = ".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ";
+    chunk += ".card h2{margin-top:0;color:#007BFF;} ";
+    chunk += ".calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} ";
+    server.sendContent(chunk);
+    
+    chunk = ".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ";
+    chunk += ".calib-btn:disabled{background:#aaa;cursor:not-allowed;} ";
+    chunk += ".home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} ";
+    server.sendContent(chunk);
+    
+    chunk = ".back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} ";
+    chunk += "#countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} ";
+    chunk += ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
+    chunk += ".prime-btn.stop:hover { background-color: #218838 !important; } ";
+    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }";
+    chunk += "</style>";
+    server.sendContent(chunk);
+    
+    // Send JavaScript
+    chunk = "<script>\n";
+    chunk += "function startCountdown() {\n";
+    chunk += "  var btn = document.getElementById('calibBtn');\n";
+    chunk += "  var homeBtn = document.getElementById('homeBtn');\n";
+    chunk += "  var backBtn = document.getElementById('backBtn');\n";
+    chunk += "  var countdown = document.getElementById('countdown');\n";
+    server.sendContent(chunk);
+    
+    chunk = "  btn.disabled = true;\n";
+    chunk += "  homeBtn.disabled = true;\n";
+    chunk += "  backBtn.disabled = true;\n";
+    chunk += "  var timeLeft = 15;\n";
+    chunk += "  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
+    chunk += "  var interval = setInterval(function() {\n";
+    server.sendContent(chunk);
+    
+    chunk = "    timeLeft--;\n";
+    chunk += "    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
+    chunk += "    if (timeLeft <= 0) {\n";
+    chunk += "      clearInterval(interval);\n";
+    chunk += "      countdown.innerText = '';\n";
+    chunk += "      btn.disabled = false;\n";
+    chunk += "      homeBtn.disabled = false;\n";
+    chunk += "      backBtn.disabled = false;\n";
+    server.sendContent(chunk);
+    
+    chunk = "    }\n";
+    chunk += "  }, 1000);\n";
+    chunk += "}\n";
+    chunk += "function onSubmitCalib(e){\n";
+    chunk += "  startCountdown();\n";
+    chunk += "}\n";
+    chunk += "</script>";
+    chunk += "</head><body>";
+    chunk += generateHeader("Calibrate: " + channelName);
+    chunk += "<div class='card'>";
+    chunk += "<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>";
+    server.sendContent(chunk);
+    
+    chunk = "<div id='countdown'></div>";
+    chunk += "<form action='/calibrate?channel=" + String(channel) + "' method='POST' onsubmit='onSubmitCalib(event)'>";
+    chunk += "<input type='hidden' name='channel' value='" + String(channel) + "'>";
+    chunk += "<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>";
+    chunk += "</form>";
+    chunk += "<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+    chunk += "<button class='back-btn' id='backBtn' onclick=\"history.back()\">Back</button>";
+    chunk += "</div>";
+    chunk += generateFooter();
+    chunk += "</body></html>";
+    server.sendContent(chunk);
+    
+    // End the response
+    server.sendContent("");
   });
 
-  server.on("/bottle", HTTP_GET, []() {
-    String html = "<html><head><title>Set Bottle Capacity</title></head><body>";
-    html += "<h1>Set Bottle Capacity</h1>";
-    html += "<form action='/bottle' method='POST'>";
-    html += "<label for='channel'>Channel:</label>";
-    html += "<select name='channel'>";
-    html += "<option value='1'>" + channel1Name + "</option>";
-    html += "<option value='2'>" + channel2Name + "</option>";
-    html += "</select><br><br>";
-    html += "<label for='ml'>Capacity (ml):</label>";
-    html += "<input type='number' name='ml' step='0.1'><br><br>";
-    html += "<input type='submit' value='Set Capacity'>";
-    html += "</form>";
-    html += "<p>Current Levels:</p>";
-    html += "<p>" + channel1Name + ": " + String(remainingMLChannel1) + " ml</p>";
-    html += "<p>" + channel2Name + ": " + String(remainingMLChannel2) + " ml</p>";
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
+  //server.on("/manual", HTTP_GET, []() {
+  //  String html = "<html><head><title>Manual Dispense</title>";
+  //  html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  //  html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .dispense-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
+  //  html += "</head><body>";
+  //  html += generateHeader("Manual Dispense");
+  //  html += "<div class='card'>";
+  //  html += "<h2>Manual Dispense</h2>";
+  //  html += "<form action='/manual' method='POST'>";
+  //  html += "<label for='channel'>Channel:</label>";
+  //  html += "<select name='channel'>";
+  //  html += "<option value='1'>" + channel1Name + "</option>";
+  //  html += "<option value='2'>" + channel2Name + "</option>";
+  //  html += "</select><br><br>";
+  //  html += "<label for='ml'>Amount (ml):</label>";
+  //  html += "<input type='number' name='ml' step='0.1'><br><br>";
+  //  html += "<button type='submit' class='dispense-btn'>Dispense</button>";
+  //  html += "</form>";
+  //  html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+  //  html += "<button class='back-btn' onclick=\"history.back()\">Back</button>";
+  //  html += "</div>";
+  //  html += generateFooter();
+  //  html += "</body></html>";
+  //  server.send(200, "text/html", html);
+  //});
+
+  //server.on("/daily", HTTP_GET, []() {
+  //  String html = "<html><head><title>Set Daily Schedule</title></head><body>";
+  //  html += "<h1>Set Daily Schedule</h1>";
+  //  
+  //  // Show current schedules
+  //  html += "<h2>Current Schedules:</h2>";
+  //  html += "<p>" + channel1Name + ": " + String(channel1Schedule.hour) + ":" + 
+  //          String(channel1Schedule.minute, 2) + " - " + String(channel1Schedule.ml) + "ml</p>";
+  //  html += "<p>" + channel2Name + ": " + String(channel2Schedule.hour) + ":" + 
+  //          String(channel2Schedule.minute, 2) + " - " + String(channel2Schedule.ml) + "ml</p>";
+  //  
+  //  // Form to set new schedule
+  //  html += "<h2>Set New Schedule:</h2>";
+  //  html += "<form action='/daily' method='POST'>";
+  //  html += "<label for='channel'>Channel:</label>";
+  //  html += "<select name='channel'>";
+  //  html += "<option value='1'>" + channel1Name + "</option>";
+  //  html += "<option value='2'>" + channel2Name + "</option>";
+  //  html += "</select><br><br>";
+  //  html += "<label for='hour'>Hour:</label>";
+  //  html += "<input type='number' name='hour' min='0' max='23'><br><br>";
+  //  html += "<label for='minute'>Minute:</label>";
+  //  html += "<input type='number' name='minute' min='0' max='59'><br><br>";
+  //  html += "<label for='ml'>Amount (ml):</label>";
+  //  html += "<input type='number' name='ml' step='0.1'><br><br>";
+  //  html += "<input type='submit' value='Set Schedule'>";
+  //  html += "</form>";
+  //  html += "<p><a href='/'>Back to Home</a></p>";
+  //  html += "</body></html>";
+  //  server.send(200, "text/html", html);
+  //});
+
+ // server.on("/bottle", HTTP_GET, []() {
+ //   String html = "<html><head><title>Set Bottle Capacity</title></head><body>";
+ //   html += "<h1>Set Bottle Capacity</h1>";
+ //   html += "<form action='/bottle' method='POST'>";
+ //   html += "<label for='channel'>Channel:</label>";
+ //   html += "<select name='channel'>";
+ //   html += "<option value='1'>" + channel1Name + "</option>";
+ //   html += "<option value='2'>" + channel2Name + "</option>";
+ //   html += "</select><br><br>";
+ //   html += "<label for='ml'>Capacity (ml):</label>";
+ //   html += "<input type='number' name='ml' step='0.1'><br><br>";
+ //   html += "<input type='submit' value='Set Capacity'>";
+ //   html += "</form>";
+ //   html += "<p>Current Levels:</p>";
+ //   html += "<p>" + channel1Name + ": " + String(remainingMLChannel1) + " ml</p>";
+ //   html += "<p>" + channel2Name + ": " + String(remainingMLChannel2) + " ml</p>";
+ //   html += "<p><a href='/'>Back to Home</a></p>";
+ //   html += "</body></html>";
+ //   server.send(200, "text/html", html);
+ // });
 
   server.on("/reset", HTTP_GET, []() {
     String html = "<html><head><title>System Reset</title></head><body>";
@@ -579,39 +607,39 @@ void setupWebServer() {
     server.send(200, "text/html", html);
   });
 
-  server.on("/view", HTTP_GET, []() {
-    String html = "<html><head>";
-    html += "<title>View Parameters</title>";
-    html += "<meta http-equiv='refresh' content='5'>";
-    html += "</head><body>";
-    html += "<h1>Current Parameters</h1>";
-    
-    // Display Channel Names
-    html += "<h2>Channel Names</h2>";
-    html += "<p>" + channel1Name + " (Channel 1)</p>";
-    html += "<p>" + channel2Name + " (Channel 2)</p>";
-    
-    // Display Remaining ML
-    html += "<h2>Remaining Liquid</h2>";
-    html += "<p>" + channel1Name + ": " + String(remainingMLChannel1) + "ml</p>";
-    html += "<p>" + channel2Name + ": " + String(remainingMLChannel2) + "ml</p>";
-    
-    // Display Daily Schedule
-    html += "<h2>Daily Schedule</h2>";
-    html += "<p>" + channel1Name + ": " + String(channel1Schedule.hour) + ":" + 
-            String(channel1Schedule.minute) + " - " + String(channel1Schedule.ml) + "ml</p>";
-    html += "<p>" + channel2Name + ": " + String(channel2Schedule.hour) + ":" + 
-            String(channel2Schedule.minute) + " - " + String(channel2Schedule.ml) + "ml</p>";
-    
-    // Display Last Dispense Info
-    html += "<h2>Last Dispense</h2>";
-    html += "<p>" + channel1Name + ": " + String(lastDispensedVolume1) + "ml at " + lastDispensedTime1 + "</p>";
-    html += "<p>" + channel2Name + ": " + String(lastDispensedVolume2) + "ml at " + lastDispensedTime2 + "</p>";
-    
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
+ // server.on("/view", HTTP_GET, []() {
+ //   String html = "<html><head>";
+ //   html += "<title>View Parameters</title>";
+ //   html += "<meta http-equiv='refresh' content='5'>";
+ //   html += "</head><body>";
+ //   html += "<h1>Current Parameters</h1>";
+ //   
+ //   // Display Channel Names
+ //   html += "<h2>Channel Names</h2>";
+ //   html += "<p>" + channel1Name + " (Channel 1)</p>";
+ //   html += "<p>" + channel2Name + " (Channel 2)</p>";
+ //   
+ //   // Display Remaining ML
+ //   html += "<h2>Remaining Liquid</h2>";
+ //   html += "<p>" + channel1Name + ": " + String(remainingMLChannel1) + "ml</p>";
+ //   html += "<p>" + channel2Name + ": " + String(remainingMLChannel2) + "ml</p>";
+ //   
+ //   // Display Daily Schedule
+ //   html += "<h2>Daily Schedule</h2>";
+ //   html += "<p>" + channel1Name + ": " + String(channel1Schedule.hour) + ":" + 
+ //           String(channel1Schedule.minute) + " - " + String(channel1Schedule.ml) + "ml</p>";
+ //   html += "<p>" + channel2Name + ": " + String(channel2Schedule.hour) + ":" + 
+ //           String(channel2Schedule.minute) + " - " + String(channel2Schedule.ml) + "ml</p>";
+ //   
+ //   // Display Last Dispense Info
+ //   html += "<h2>Last Dispense</h2>";
+ //   html += "<p>" + channel1Name + ": " + String(lastDispensedVolume1) + "ml at " + lastDispensedTime1 + "</p>";
+ //   html += "<p>" + channel2Name + ": " + String(lastDispensedVolume2) + "ml at " + lastDispensedTime2 + "</p>";
+ //   
+ //   html += "<p><a href='/'>Back to Home</a></p>";
+ //   html += "</body></html>";
+ //   server.send(200, "text/html", html);
+ // });
 
   server.on("/timezone", HTTP_GET, []() {
     String html = "<html><head><title>Set Timezone</title></head><body>";
@@ -666,8 +694,8 @@ void setupWebServer() {
 
   server.on("/calibrate", HTTP_POST, handleCalibration);
   server.on("/manual", HTTP_POST, handleManualDispense);
-  server.on("/daily", HTTP_POST, handleDailyDispense);
-  server.on("/bottle", HTTP_POST, handleBottleTracking);
+  //server.on("/daily", HTTP_POST, handleDailyDispense);
+  //server.on("/bottle", HTTP_POST, handleBottleTracking);
   server.on("/reset", HTTP_POST, handleSystemReset);
   server.on("/prime", HTTP_POST, handlePrimePump);
 
@@ -675,97 +703,160 @@ void setupWebServer() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
     String channelName = (channel == 1) ? channel1Name : channel2Name;
-    String html = "<html><head>";
-    html += "<title>Prime Pump</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } .card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } .prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } .prime-btn.stop { background: #28a745; } .prime-btn:active { opacity: 0.9; } .home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } .back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-    html += "<script>\n";
-    html += "function togglePrime() {\n";
-    html += "  var btn = document.getElementById('primeButton');\n";
-    html += "  var state = btn.getAttribute('data-state') === '1' ? '0' : '1';\n";
-    html += "  var xhr = new XMLHttpRequest();\n";
-    html += "  xhr.open('POST', '/prime', true);\n";
-    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    html += "  xhr.send('channel=" + String(channel) + "&state=' + state);\n";
-    html += "  btn.setAttribute('data-state', state);\n";
-    html += "  btn.value = state === '1' ? 'Done' : 'Start';\n";
-    html += "  btn.className = state === '1' ? 'prime-btn stop' : 'prime-btn';\n";
-    html += "}\n";
-    html += "window.onload = function() {\n";
-    html += "  var btn = document.getElementById('primeButton');\n";
-    html += "  btn.value = 'Start';\n";
-    html += "  btn.className = 'prime-btn';\n";
-    html += "}\n";
-    html += "</script>";
-    html += "</head><body>";
-    html += generateHeader("Prime Pump: " + channelName);
-    html += "<div class='card'>";
-   
-    html += "<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>";
-    html += "<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>";
-    html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-    html += "<button class='back-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;' onclick=\"history.back()\">Back</button>";
-    html += "</div>";
-    html += generateFooter();
-    html += "</body></html>";
-    server.send(200, "text/html", html);
+    
+    // Start chunked response
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+    
+    // Send HTML header
+    String chunk = "<html><head>";
+    chunk += "<title>Prime Pump</title>";
+    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } ";
+    server.sendContent(chunk);
+    
+    // CSS in chunks
+    chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } ";
+    chunk += ".card h2 { margin-top: 0; color: #007BFF; } ";
+    chunk += ".prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } ";
+    chunk += ".prime-btn.stop { background: #28a745; } ";
+    chunk += ".prime-btn:active { opacity: 0.9; } ";
+    chunk += ".home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } ";
+    chunk += ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
+    chunk += ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".prime-btn.stop:hover { background-color: #218838 !important; } ";
+    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }";
+    chunk += "</style>";
+    server.sendContent(chunk);
+    
+    // JavaScript
+    chunk = "<script>\n";
+    chunk += "function togglePrime() {\n";
+    chunk += "  var btn = document.getElementById('primeButton');\n";
+    chunk += "  var state = btn.getAttribute('data-state') === '1' ? '0' : '1';\n";
+    chunk += "  var xhr = new XMLHttpRequest();\n";
+    chunk += "  xhr.open('POST', '/prime', true);\n";
+    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    chunk += "  xhr.send('channel=" + String(channel) + "&state=' + state);\n";
+    chunk += "  btn.setAttribute('data-state', state);\n";
+    chunk += "  btn.value = state === '1' ? 'Done' : 'Start';\n";
+    chunk += "  btn.className = state === '1' ? 'prime-btn stop' : 'prime-btn';\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "window.onload = function() {\n";
+    chunk += "  var btn = document.getElementById('primeButton');\n";
+    chunk += "  btn.value = 'Start';\n";
+    chunk += "  btn.className = 'prime-btn';\n";
+    chunk += "}\n";
+    chunk += "</script>";
+    chunk += "</head><body>";
+    server.sendContent(chunk);
+    
+    // Body content
+    chunk = generateHeader("Prime Pump: " + channelName);
+    chunk += "<div class='card'>";
+    chunk += "<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>";
+    chunk += "<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>";
+    chunk += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+    chunk += "<button class='back-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;' onclick=\"history.back()\">Back</button>";
+    chunk += "</div>";
+    chunk += generateFooter();
+    chunk += "</body></html>";
+    server.sendContent(chunk);
+    
+    // End chunked response
+    server.sendContent("");
   });
 
-  server.on("/names", HTTP_GET, []() {
-    String html = "<html><head><title>Set Channel Names</title></head><body>";
-    html += "<h1>Set Channel Names</h1>";
-    html += "<form action='/names' method='POST'>";
-    html += "<label for='name1'>Name for Channel 1:</label><br>";
-    html += "<input type='text' name='name1' value='" + channel1Name + "'><br><br>";
-    html += "<label for='name2'>Name for Channel 2:</label><br>";
-    html += "<input type='text' name='name2' value='" + channel2Name + "'><br><br>";
-    html += "<input type='submit' value='Set Names'>";
-    html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
+ // server.on("/names", HTTP_GET, []() {
+ //   String html = "<html><head><title>Set Channel Names</title></head><body>";
+ //   html += "<h1>Set Channel Names</h1>";
+ //   html += "<form action='/names' method='POST'>";
+ //   html += "<label for='name1'>Name for Channel 1:</label><br>";
+ //   html += "<input type='text' name='name1' value='" + channel1Name + "'><br><br>";
+ //   html += "<label for='name2'>Name for Channel 2:</label><br>";
+ //   html += "<input type='text' name='name2' value='" + channel2Name + "'><br><br>";
+ //   html += "<input type='submit' value='Set Names'>";
+ //   html += "</form>";
+ //   html += "<p><a href='/'>Back to Home</a></p>";
+ //   html += "</body></html>";
+ //   server.send(200, "text/html", html);
+ // });
 
-  server.on("/names", HTTP_POST, []() {
-    if (server.hasArg("name1") && server.hasArg("name2")) {
-      channel1Name = server.arg("name1");
-      channel2Name = server.arg("name2");
-      savePersistentDataToSPIFFS();
-      server.sendHeader("Location", "/");
-      server.send(302, "text/plain", "");
-    } else {
-      server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
-    }
-  });
+ // server.on("/names", HTTP_POST, []() {
+ //   if (server.hasArg("name1") && server.hasArg("name2")) {
+ //     channel1Name = server.arg("name1");
+ //     channel2Name = server.arg("name2");
+ //     savePersistentDataToSPIFFS();
+ //     server.sendHeader("Location", "/");
+ //     server.send(302, "text/plain", "");
+ //   } else {
+ //     server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+ //   }
+ // });
 
-  // In setupWebServer() function, update the /bottleconfig endpoint
-  server.on("/bottleconfig", HTTP_GET, []() {
-    String html = "<html><head><title>Bottle Configuration</title></head><body>";
-    html += "<h1>Bottle Configuration</h1>";
-    html += "<form action='/bottleconfig' method='POST'>";
-    html += "<label for='channel'>Select Channel:</label>";
-    html += "<select name='channel'>";
-    html += "<option value='1'>" + channel1Name + "</option>";
-    html += "<option value='2'>" + channel2Name + "</option>";
-    html += "</select><br><br>";
-    html += "<label for='capacity'>Bottle Capacity (ml):</label>";
-    html += "<input type='number' name='capacity' step='0.1'><br><br>";
-    html += "<input type='submit' value='Set Capacity'>";
-    html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
+ // // In setupWebServer() function, update the /bottleconfig endpoint
+ // server.on("/bottleconfig", HTTP_GET, []() {
+ //   String html = "<html><head><title>Bottle Configuration</title></head><body>";
+ //   html += "<h1>Bottle Configuration</h1>";
+ //   html += "<form action='/bottleconfig' method='POST'>";
+ //   html += "<label for='channel'>Select Channel:</label>";
+ //   html += "<select name='channel'>";
+ //   html += "<option value='1'>" + channel1Name + "</option>";
+ //   html += "<option value='2'>" + channel2Name + "</option>";
+ //   html += "</select><br><br>";
+ //   html += "<label for='capacity'>Bottle Capacity (ml):</label>";
+ //   html += "<input type='number' name='capacity' step='0.1'><br><br>";
+ //   html += "<input type='submit' value='Set Capacity'>";
+ //   html += "</form>";
+ //   html += "<p><a href='/'>Back to Home</a></p>";
+ //   html += "</body></html>";
+ //   server.send(200, "text/html", html);
+ // });
 
   server.on("/newUI/summary", HTTP_GET, []() {
     Serial.print("[SUMMARY] lastDispensedVolume1: "); Serial.println(lastDispensedVolume1);
     Serial.print("[SUMMARY] lastDispensedTime1: "); Serial.println(lastDispensedTime1);
     Serial.print("[SUMMARY] lastDispensedVolume2: "); Serial.println(lastDispensedVolume2);
     Serial.print("[SUMMARY] lastDispensedTime2: "); Serial.println(lastDispensedTime2);
-    String html = "<html><head><title>Dosing Summary</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>";
-    html += generateHeader("Dosing Summary");
+    
+    // Start chunked response
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+    
+    // Send HTML header
+    String chunk = "<html><head><title>Dosing Summary</title>";
+    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ";
+    server.sendContent(chunk);
+    
+    // Send CSS in chunks
+    chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ";
+    chunk += ".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ";
+    chunk += "border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
+    chunk += ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
+    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>";
+    server.sendContent(chunk);
+    
+    // Generate header
+    chunk = generateHeader("Dosing Summary");
+    server.sendContent(chunk);
+    
     // Channel 1 Summary
     int daysRemaining1 = 0;
     float rem1 = remainingMLChannel1;
@@ -786,20 +877,25 @@ void setupWebServer() {
       daysRemaining1 = 366;
       moreThanYear1 = true;
     }
-    html += "<div class='card'>";
-    html += "<h2>" + channel1Name + "</h2>";
-    html += "<p>Last Dosed Time: " + lastDispensedTime1 + "</p>";
-    html += "<p>Last Volume: " + String(lastDispensedVolume1) + " ml</p>";
-    html += "<p>Remaining Volume: " + String(remainingMLChannel1) + " ml</p>";
-    html += "<p>Days Remaining: ";
-    if (moreThanYear1) html += "More than a year";
-    else html += String(simulatedDays1);
-    html += "</p>";
-    html += "<div id='manualDoseSection1'>";
-    html += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>";
-    html += "</div>";
-    html += "<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>";
-    html += "</div>";
+    
+    chunk = "<div class='card'>";
+    chunk += "<h2>" + channel1Name + "</h2>";
+    chunk += "<p>Last Dosed Time: " + lastDispensedTime1 + "</p>";
+    chunk += "<p>Last Volume: " + String(lastDispensedVolume1) + " ml</p>";
+    chunk += "<p>Remaining Volume: " + String(remainingMLChannel1) + " ml</p>";
+    chunk += "<p>Days Remaining: ";
+    if (moreThanYear1) chunk += "More than a year";
+    else chunk += String(simulatedDays1);
+    chunk += "</p>";
+    server.sendContent(chunk);
+    
+    chunk = "<div id='manualDoseSection1'>";
+    chunk += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>";
+    chunk += "</div>";
+    chunk += "<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
     // Channel 2 Summary
     int daysRemaining2 = 0;
     float rem2 = remainingMLChannel2;
@@ -820,85 +916,110 @@ void setupWebServer() {
       daysRemaining2 = 366;
       moreThanYear2 = true;
     }
-    html += "<div class='card'>";
-    html += "<h2>" + channel2Name + "</h2>";
-    html += "<p>Last Dosed Time: " + lastDispensedTime2 + "</p>";
-    html += "<p>Last Volume: " + String(lastDispensedVolume2) + " ml</p>";
-    html += "<p>Remaining Volume: " + String(remainingMLChannel2) + " ml</p>";
-    html += "<p>Days Remaining: ";
-    if (moreThanYear2) html += "More than a year";
-    else html += String(simulatedDays2);
-    html += "</p>";
-    html += "<div id='manualDoseSection2'>";
-    html += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>";
-    html += "</div>";
-    html += "<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>";
-    html += "</div>";
+    
+    chunk = "<div class='card'>";
+    chunk += "<h2>" + channel2Name + "</h2>";
+    chunk += "<p>Last Dosed Time: " + lastDispensedTime2 + "</p>";
+    chunk += "<p>Last Volume: " + String(lastDispensedVolume2) + " ml</p>";
+    chunk += "<p>Remaining Volume: " + String(remainingMLChannel2) + " ml</p>";
+    chunk += "<p>Days Remaining: ";
+    if (moreThanYear2) chunk += "More than a year";
+    else chunk += String(simulatedDays2);
+    chunk += "</p>";
+    server.sendContent(chunk);
+    
+    chunk = "<div id='manualDoseSection2'>";
+    chunk += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>";
+    chunk += "</div>";
+    chunk += "<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
     // System Time and Actions
-    html += "<div class='card'>";
-    html += "<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>";
-    html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>" + getFormattedTime() + "</span></div>";
-    html += "</div>";
-    // REMOVE the last Manual Dose button outside the cards (do not add it here)
-    html += generateFooter();
-    html += "<script>\n";
-    html += "function showManualDose1() {\n";
-    html += "  var s = document.getElementById('manualDoseSection1');\n";
-    html += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
-    html += "}\n";
-    html += "function showManualDose2() {\n";
-    html += "  var s = document.getElementById('manualDoseSection2');\n";
-    html += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol2' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow2()'>Dose</button><button id='cancelBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose2()'>Cancel</button></div><div id='doseCountdown2' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
-    html += "}\n";
-    html += "function cancelManualDose1() {\n";
-    html += "  var s = document.getElementById('manualDoseSection1');\n";
-    html += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>`;\n";
-    html += "}\n";
-    html += "function cancelManualDose2() {\n";
-    html += "  var s = document.getElementById('manualDoseSection2');\n";
-    html += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>`;\n";
-    html += "}\n";
-    html += "function doseNow1() {\n";
-    html += "  var vol = parseFloat(document.getElementById('doseVol1').value);\n";
-    html += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
-    html += "  var btn = document.getElementById('doseBtn1');\n";
-    html += "  var cancel = document.getElementById('cancelBtn1');\n";
-    html += "  btn.disabled = true; cancel.disabled = true;\n";
-    html += "  var countdown = document.getElementById('doseCountdown1');\n";
-    html += "  var duration = Math.ceil(vol * " + String(calibrationFactor1) + " / 1000);\n";
-    html += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
-    html += "  var interval = setInterval(function() {\n";
-    html += "    duration--;\n";
-    html += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
-    html += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
-    html += "  }, 1000);\n";
-    html += "  var xhr = new XMLHttpRequest();\n";
-    html += "  xhr.open('POST', '/manual', true);\n";
-    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    html += "  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n";
-    html += "}\n";
-    html += "function doseNow2() {\n";
-    html += "  var vol = parseFloat(document.getElementById('doseVol2').value);\n";
-    html += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
-    html += "  var btn = document.getElementById('doseBtn2');\n";
-    html += "  var cancel = document.getElementById('cancelBtn2');\n";
-    html += "  btn.disabled = true; cancel.disabled = true;\n";
-    html += "  var countdown = document.getElementById('doseCountdown2');\n";
-    html += "  var duration = Math.ceil(vol * " + String(calibrationFactor2) + " / 1000);\n";
-    html += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
-    html += "  var interval = setInterval(function() {\n";
-    html += "    duration--;\n";
-    html += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
-    html += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
-    html += "  }, 1000);\n";
-    html += "  var xhr = new XMLHttpRequest();\n";
-    html += "  xhr.open('POST', '/manual', true);\n";
-    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    html += "  xhr.send('channel=2&ml=' + encodeURIComponent(vol));\n";
-    html += "}\n";
-    html += "</script>\n";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
+    chunk = "<div class='card'>";
+    chunk += "<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>";
+    chunk += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>" + getFormattedTime() + "</span></div>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
+    // Generate footer
+    chunk = generateFooter();
+    server.sendContent(chunk);
+    
+    // JavaScript
+    chunk = "<script>\n";
+    chunk += "function showManualDose1() {\n";
+    chunk += "  var s = document.getElementById('manualDoseSection1');\n";
+    chunk += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function showManualDose2() {\n";
+    chunk += "  var s = document.getElementById('manualDoseSection2');\n";
+    chunk += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol2' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow2()'>Dose</button><button id='cancelBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose2()'>Cancel</button></div><div id='doseCountdown2' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function cancelManualDose1() {\n";
+    chunk += "  var s = document.getElementById('manualDoseSection1');\n";
+    chunk += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>`;\n";
+    chunk += "}\n";
+    chunk += "function cancelManualDose2() {\n";
+    chunk += "  var s = document.getElementById('manualDoseSection2');\n";
+    chunk += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>`;\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function doseNow1() {\n";
+    chunk += "  var vol = parseFloat(document.getElementById('doseVol1').value);\n";
+    chunk += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
+    chunk += "  var btn = document.getElementById('doseBtn1');\n";
+    chunk += "  var cancel = document.getElementById('cancelBtn1');\n";
+    chunk += "  btn.disabled = true; cancel.disabled = true;\n";
+    chunk += "  var countdown = document.getElementById('doseCountdown1');\n";
+    chunk += "  var duration = Math.ceil(vol * " + String(calibrationFactor1) + " / 1000);\n";
+    chunk += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    server.sendContent(chunk);
+    
+    chunk = "  var interval = setInterval(function() {\n";
+    chunk += "    duration--;\n";
+    chunk += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    chunk += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
+    chunk += "  }, 1000);\n";
+    chunk += "  var xhr = new XMLHttpRequest();\n";
+    chunk += "  xhr.open('POST', '/manual', true);\n";
+    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    chunk += "  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function doseNow2() {\n";
+    chunk += "  var vol = parseFloat(document.getElementById('doseVol2').value);\n";
+    chunk += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
+    chunk += "  var btn = document.getElementById('doseBtn2');\n";
+    chunk += "  var cancel = document.getElementById('cancelBtn2');\n";
+    chunk += "  btn.disabled = true; cancel.disabled = true;\n";
+    chunk += "  var countdown = document.getElementById('doseCountdown2');\n";
+    chunk += "  var duration = Math.ceil(vol * " + String(calibrationFactor2) + " / 1000);\n";
+    chunk += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    server.sendContent(chunk);
+    
+    chunk = "  var interval = setInterval(function() {\n";
+    chunk += "    duration--;\n";
+    chunk += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    chunk += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
+    chunk += "  }, 1000);\n";
+    chunk += "  var xhr = new XMLHttpRequest();\n";
+    chunk += "  xhr.open('POST', '/manual', true);\n";
+    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    chunk += "  xhr.send('channel=2&ml=' + encodeURIComponent(vol));\n";
+    chunk += "}\n";
+    chunk += "</script>\n";
+    chunk += "</body></html>";
+    server.sendContent(chunk);
+    
+    // End the chunked response
+    server.sendContent("");
   });
 
   server.on("/newUI/manageChannel", HTTP_GET, []() {
@@ -915,53 +1036,105 @@ void setupWebServer() {
     float remainingML = (channel == 1) ? remainingMLChannel1 : remainingMLChannel2;
     DailySchedule schedule = (channel == 1) ? channel1Schedule : channel2Schedule;
     
-    String html = "<html><head><title>Channel Management: " + channelName + "</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } .rename-input { flex:1; padding:8px 12px; font-size:1em; border-radius:4px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; } .rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } .rename-btn.cancel { background:#aaa; } .rename-row { display:flex; gap:8px; align-items:center; justify-content:center; } .rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } .rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } .rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-    html += "<script>\n";
-    html += "function showRenameBox() {\n";
-    html += "  document.getElementById('rename-row').style.display = 'flex';\n";
-    html += "  document.getElementById('rename-btn-row').style.display = 'none';\n";
-    html += "}\n";
-    html += "function cancelRename() {\n";
-    html += "  document.getElementById('rename-row').style.display = 'none';\n";
-    html += "  document.getElementById('rename-btn-row').style.display = 'block';\n";
-    html += "}\n";
-    html += "function saveRename(channel) {\n";
-    html += "  var newName = document.getElementById('rename-input').value;\n";
-    html += "  if (!newName) { alert('Name cannot be empty'); return; }\n";
-    html += "  var xhr = new XMLHttpRequest();\n";
-    html += "  xhr.open('POST', '/newUI/renameChannel', true);\n";
-    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    html += "  xhr.onreadystatechange = function() {\n";
-    html += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
-    html += "  };\n";
-    html += "  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n";
-    html += "}\n";
-    html += "function showUpdateVolumeBox() {\n";
-    html += "  document.getElementById('update-volume-row').style.display = 'flex';\n";
-    html += "  document.getElementById('update-volume-btn-row').style.display = 'none';\n";
-    html += "}\n";
-    html += "function cancelUpdateVolume() {\n";
-    html += "  document.getElementById('update-volume-row').style.display = 'none';\n";
-    html += "  document.getElementById('update-volume-btn-row').style.display = 'inline';\n";
-    html += "}\n";
-    html += "function saveUpdateVolume(channel) {\n";
-    html += "  var newVol = document.getElementById('update-volume-input').value;\n";
-    html += "  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n";
-    html += "  var xhr = new XMLHttpRequest();\n";
-    html += "  xhr.open('POST', '/newUI/updateVolume', true);\n";
-    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    html += "  xhr.onreadystatechange = function() {\n";
-    html += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
-    html += "  };\n";
-    html += "  xhr.send('channel=' + channel + '&volume=' + encodeURIComponent(newVol));\n";
-    html += "}\n";
-    html += "</script>\n";
-    html += "</head><body>";
-    html += generateHeader("Channel Management: " + channelName);
-    // Status Card
-    // Calculate days remaining for this channel (same logic as summary)
+    // Start chunked response
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+    
+    // Send HTML header
+    String chunk = "<html><head><title>Channel Management: " + channelName + "</title>";
+    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ";
+    server.sendContent(chunk);
+    
+    // CSS in chunks
+    chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ";
+    chunk += ".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ";
+    chunk += "border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } ";
+    chunk += ".rename-input { flex:1; padding:8px 12px; font-size:1em; border-radius:4px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } ";
+    chunk += ".rename-btn.cancel { background:#aaa; } .rename-row { display:flex; gap:8px; align-items:center; justify-content:center; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } ";
+    chunk += ".rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } ";
+    chunk += "button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } ";
+    server.sendContent(chunk);
+    
+    chunk = ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
+    chunk += ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
+    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
+    server.sendContent(chunk);
+    
+    // JavaScript
+    chunk = "<script>\n";
+    chunk += "function showRenameBox() {\n";
+    chunk += "  document.getElementById('rename-row').style.display = 'flex';\n";
+    chunk += "  document.getElementById('rename-btn-row').style.display = 'none';\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function cancelRename() {\n";
+    chunk += "  document.getElementById('rename-row').style.display = 'none';\n";
+    chunk += "  document.getElementById('rename-btn-row').style.display = 'block';\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function saveRename(channel) {\n";
+    chunk += "  var newName = document.getElementById('rename-input').value;\n";
+    chunk += "  if (!newName) { alert('Name cannot be empty'); return; }\n";
+    chunk += "  var xhr = new XMLHttpRequest();\n";
+    chunk += "  xhr.open('POST', '/newUI/renameChannel', true);\n";
+    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    chunk += "  xhr.onreadystatechange = function() {\n";
+    chunk += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
+    chunk += "  };\n";
+    chunk += "  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function showUpdateVolumeBox() {\n";
+    chunk += "  document.getElementById('update-volume-row').style.display = 'flex';\n";
+    chunk += "  document.getElementById('update-volume-btn-row').style.display = 'none';\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function cancelUpdateVolume() {\n";
+    chunk += "  document.getElementById('update-volume-row').style.display = 'none';\n";
+    chunk += "  document.getElementById('update-volume-btn-row').style.display = 'inline';\n";
+    chunk += "}\n";
+    server.sendContent(chunk);
+    
+    chunk = "function saveUpdateVolume(channel) {\n";
+    chunk += "  var newVol = document.getElementById('update-volume-input').value;\n";
+    chunk += "  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n";
+    chunk += "  var xhr = new XMLHttpRequest();\n";
+    chunk += "  xhr.open('POST', '/newUI/updateVolume', true);\n";
+    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    chunk += "  xhr.onreadystatechange = function() {\n";
+    chunk += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
+    chunk += "  };\n";
+    chunk += "  xhr.send('channel=' + channel + '&volume=' + encodeURIComponent(newVol));\n";
+    chunk += "}\n";
+    chunk += "</script>\n";
+    chunk += "</head><body>";
+    server.sendContent(chunk);
+    
+    // Header
+    chunk = generateHeader("Channel Management: " + channelName);
+    server.sendContent(chunk);
+    
+    // Calculate days remaining for this channel
     int daysRemaining = 0;
     float rem = remainingML;
     int dayIdx = (timeClient.getDay() + 6) % 7;
@@ -982,25 +1155,33 @@ void setupWebServer() {
       daysRemaining = 366;
       moreThanYear = true;
     }
-    html += "<div class='card'>";
-    html += "<h2>Status</h2>";
-    html += "<p>Last Dosed: " + lastDispensedTime + "</p>";
-    html += "<p>Last Volume: " + String(lastDispensedVolume) + " ml</p>";
-    html += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (";
-    if (moreThanYear) html += "More than a year";
-    else html += String(simulatedDays) + " days";
-    html += ")</span> ";
-    html += "<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>";
-    html += "<span id='update-volume-row' class='rename-row' style='display:none;'>";
-    html += "<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='" + String(remainingML) + "'>";
-    html += "<button class='rename-btn' onclick='saveUpdateVolume(" + String(channel) + ")'>Save</button>";
-    html += "<button class='rename-btn cancel' onclick='cancelUpdateVolume()'>Cancel</button>";
-    html += "</span></p>";
-    html += "</div>";
+    
+    // Status Card
+    chunk = "<div class='card'>";
+    chunk += "<h2>Status</h2>";
+    chunk += "<p>Last Dosed: " + lastDispensedTime + "</p>";
+    chunk += "<p>Last Volume: " + String(lastDispensedVolume) + " ml</p>";
+    chunk += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (";
+    if (moreThanYear) chunk += "More than a year";
+    else chunk += String(simulatedDays) + " days";
+    chunk += ")</span> ";
+    server.sendContent(chunk);
+    
+    chunk = "<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>";
+    chunk += "<span id='update-volume-row' class='rename-row' style='display:none;'>";
+    chunk += "<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='" + String(remainingML) + "'>";
+    chunk += "<button class='rename-btn' onclick='saveUpdateVolume(" + String(channel) + ")'>Save</button>";
+    chunk += "<button class='rename-btn cancel' onclick='cancelUpdateVolume()'>Cancel</button>";
+    chunk += "</span></p>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
     // Schedule Card
-    html += "<div class='card'>";
-    html += "<h2>Schedule</h2>";
-    // --- Show next dose from weekly schedule ---
+    chunk = "<div class='card'>";
+    chunk += "<h2>Schedule</h2>";
+    server.sendContent(chunk);
+    
+    // Show next dose from weekly schedule
     int today = (timeClient.getDay() + 6) % 7; // 0=Monday, 6=Sunday
     WeeklySchedule* ws = (channel == 1) ? &weeklySchedule1 : &weeklySchedule2;
     int nowHour = timeClient.getHours();
@@ -1025,38 +1206,49 @@ void setupWebServer() {
         }
       }
     }
+    
     if (nextDay >= 0) {
       String ampm = (nextHour < 12) ? "AM" : "PM";
       int hour12 = nextHour % 12 == 0 ? 12 : nextHour % 12;
-      html += "<p>Next Dose: " + String(dayNames[nextDay]) + ", " + String(hour12) + ":" + (nextMinute < 10 ? "0" : "") + String(nextMinute) + " " + ampm + "</p>";
-      html += "<p>Next Dose Volume: " + String(nextVol) + " ml</p>";
+      chunk = "<p>Next Dose: " + String(dayNames[nextDay]) + ", " + String(hour12) + ":" + (nextMinute < 10 ? "0" : "") + String(nextMinute) + " " + ampm + "</p>";
+      chunk += "<p>Next Dose Volume: " + String(nextVol) + " ml</p>";
     } else {
-      html += "<p>Next Dose: N/A</p>";
-      html += "<p>Next Dose Volume: N/A</p>";
+      chunk = "<p>Next Dose: N/A</p>";
+      chunk += "<p>Next Dose Volume: N/A</p>";
     }
-    html += "<button onclick=\"location.href='/newUI/manageSchedule?channel=" + String(channel) + "'\">Manage Schedule</button>";
-    html += "</div>";
-    html += "<div class='card'>";
-    html += "<button onclick=\"location.href='/prime?channel=" + String(channel) + "'\">Prime Pump</button>";
-    html += "<button onclick=\"location.href='/calibrate?channel=" + String(channel) + "'\">Calibrate</button>";
-    // Rename UI
-    html += "<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>";
-    html += "<div id='rename-row' class='rename-row' style='display:none;'>";
-    html += "<input id='rename-input' class='rename-input' type='text' value='" + channelName + "'>";
-    html += "<button class='rename-btn' onclick='saveRename(" + String(channel) + ")'>Save</button>";
-    html += "<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>";
-    //html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-      
-    html += "</div>";
-    html += "</div>";
-    // Add Back and Home buttons row (not on summary page)
-    html += "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'><button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button></div>";
-    //html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-      
-    html += generateFooter();
+    chunk += "<button onclick=\"location.href='/newUI/manageSchedule?channel=" + String(channel) + "'\">Manage Schedule</button>";
+    chunk += "</div>";
+    server.sendContent(chunk);
     
-    html += "</body></html>";
-    server.send(200, "text/html", html);
+    // Actions Card
+    chunk = "<div class='card'>";
+    chunk += "<button onclick=\"location.href='/prime?channel=" + String(channel) + "'\">Prime Pump</button>";
+    chunk += "<button onclick=\"location.href='/calibrate?channel=" + String(channel) + "'\">Calibrate</button>";
+    server.sendContent(chunk);
+    
+    // Rename UI
+    chunk = "<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>";
+    chunk += "<div id='rename-row' class='rename-row' style='display:none;'>";
+    chunk += "<input id='rename-input' class='rename-input' type='text' value='" + channelName + "'>";
+    chunk += "<button class='rename-btn' onclick='saveRename(" + String(channel) + ")'>Save</button>";
+    chunk += "<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>";
+    chunk += "</div>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
+    // Back and Home buttons row
+    chunk = "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>";
+    chunk += "<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
+    // Footer
+    chunk = generateFooter();
+    chunk += "</body></html>";
+    server.sendContent(chunk);
+    
+    // End chunked response
+    server.sendContent("");
   });
 
   // Add endpoint to handle rename POST
@@ -1098,90 +1290,99 @@ void setupWebServer() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
     WeeklySchedule* ws = (channel == 2) ? &weeklySchedule2 : &weeklySchedule1;
-    String html = "<html><head><title>Manage Schedule: " + ws->channelName + "</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-    html += "<script>\n";
-    html += "function copyMondayToOthers() {\n";
-    html += "  var enabled=document.getElementById('enabled0').checked;\n";
-    html += "  var time=document.getElementById('time0').value;\n";
-    html += "  var vol=document.getElementById('vol0').value;\n";
-    html += "  for(var i=1;i<7;i++){\n";
-    html += "    document.getElementById('enabled'+i).checked=enabled;\n";
-    html += "    document.getElementById('time'+i).value=time;\n";
-    html += "    document.getElementById('vol'+i).value=vol;\n";
-    html += "    document.getElementById('enabled'+i).disabled=true;\n";
-    html += "    document.getElementById('time'+i).disabled=true;\n";
-    html += "    document.getElementById('vol'+i).disabled=true;\n";
-    html += "  }\n";
-    html += "}\n";
-    html += "function uncopyMonday() {\n";
-    html += "  for(var i=1;i<7;i++){\n";
-    html += "    document.getElementById('enabled'+i).disabled=false;\n";
-    html += "    document.getElementById('time'+i).disabled=false;\n";
-    html += "    document.getElementById('vol'+i).disabled=false;\n";
-    html += "  }\n";
-    html += "}\n";
-    html += "function onCopyChange(cb){if(cb.checked){copyMondayToOthers();}else{uncopyMonday();}}\n";
-    html += "window.addEventListener('DOMContentLoaded',function(){\n";
-    html += "  document.getElementById('enabled0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
-    html += "  document.getElementById('time0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
-    html += "  document.getElementById('vol0').addEventListener('input',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
-    html += "});\n";
-    html += "</script>\n";
-    html += "</head><body>";
-    html += generateHeader("Manage Schedule : " + ws->channelName);
-    html += "<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>";
-    html += "<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=" + String(channel) + "'>";
-    html += "<table style='width:100%;border-collapse:collapse;'>";
-    html += "<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>";
+    // Start chunked response
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+    // HTML head and style
+    String chunk = "<html><head><title>Manage Schedule: " + ws->channelName + "</title>";
+    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
+    server.sendContent(chunk);
+    // JS chunk
+    chunk = "<script>\n";
+    chunk += "function copyMondayToOthers() {\n";
+    chunk += "  var enabled=document.getElementById('enabled0').checked;\n";
+    chunk += "  var time=document.getElementById('time0').value;\n";
+    chunk += "  var vol=document.getElementById('vol0').value;\n";
+    chunk += "  for(var i=1;i<7;i++){\n";
+    chunk += "    document.getElementById('enabled'+i).checked=enabled;\n";
+    chunk += "    document.getElementById('time'+i).value=time;\n";
+    chunk += "    document.getElementById('vol'+i).value=vol;\n";
+    chunk += "    document.getElementById('enabled'+i).disabled=true;\n";
+    chunk += "    document.getElementById('time'+i).disabled=true;\n";
+    chunk += "    document.getElementById('vol'+i).disabled=true;\n";
+    chunk += "  }\n";
+    chunk += "}\n";
+    chunk += "function uncopyMonday() {\n";
+    chunk += "  for(var i=1;i<7;i++){\n";
+    chunk += "    document.getElementById('enabled'+i).disabled=false;\n";
+    chunk += "    document.getElementById('time'+i).disabled=false;\n";
+    chunk += "    document.getElementById('vol'+i).disabled=false;\n";
+    chunk += "  }\n";
+    chunk += "}\n";
+    chunk += "function onCopyChange(cb){if(cb.checked){copyMondayToOthers();}else{uncopyMonday();}}\n";
+    chunk += "window.addEventListener('DOMContentLoaded',function(){\n";
+    chunk += "  document.getElementById('enabled0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
+    chunk += "  document.getElementById('time0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
+    chunk += "  document.getElementById('vol0').addEventListener('input',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
+    chunk += "});\n";
+    chunk += "</script>\n";
+    chunk += "</head><body>";
+    server.sendContent(chunk);
+    // Header and card open
+    chunk = generateHeader("Manage Schedule : " + ws->channelName);
+    chunk += "<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>";
+    chunk += "<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=" + String(channel) + "'>";
+    chunk += "<table style='width:100%;border-collapse:collapse;'>";
+    chunk += "<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>";
+    server.sendContent(chunk);
+    // Table rows chunked
     for (int i = 0; i < 7; ++i) {
       String rowShade = (i % 2 == 0) ? "background:#f9f9f9;" : "background:#fff;";
-      html += "<tr style='" + rowShade + "'>";
-      html += "<td>" + String(dayNames[i]) + "</td>";
-      html += "<td><input type='checkbox' id='enabled" + String(i) + "' name='enabled" + String(i) + "'" + (ws->days[i].enabled ? " checked" : "") + "></td>";
+      chunk = "<tr style='" + rowShade + "'>";
+      chunk += "<td>" + String(dayNames[i]) + "</td>";
+      chunk += "<td><input type='checkbox' id='enabled" + String(i) + "' name='enabled" + String(i) + "'" + (ws->days[i].enabled ? " checked" : "") + "></td>";
       char timebuf[6];
       snprintf(timebuf, sizeof(timebuf), "%02d:%02d", ws->days[i].hour, ws->days[i].minute);
-      html += "<td><input type='time' id='time" + String(i) + "' name='time" + String(i) + "' value='" + String(timebuf) + "'></td>";
-      html += "<td><input type='number' id='vol" + String(i) + "' name='vol" + String(i) + "' step='0.01' min='0' value='" + String(ws->days[i].volume, 2) + "'></td>";
-      html += "</tr>";
+      chunk += "<td><input type='time' id='time" + String(i) + "' name='time" + String(i) + "' value='" + String(timebuf) + "'></td>";
+      chunk += "<td><input type='number' id='vol" + String(i) + "' name='vol" + String(i) + "' step='0.01' min='0' value='" + String(ws->days[i].volume, 2) + "'></td>";
+      chunk += "</tr>";
+      server.sendContent(chunk);
     }
-    html += "</table>";
-    html += "<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>";
-    html += String("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'") + (ws->missedDoseCompensation ? " checked" : "") + "><label for='missedDose'>Missed Dose Compensation</label></div>";
-    html += "<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>";
-    html += "<button type='submit' style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;'>Save</button>";
-    html += "<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;'>Cancel</button>";
-    html += "</div>";
-    html += "</form>";
-    html += "</div>";
-    html += generateFooter();
-    // Add script to enable all fields and copy Monday's values before submit if copyMonday is checked
-    html += "<script>\n";
-    html += "document.getElementById('scheduleForm').addEventListener('submit',function(e){\n";
-    html += "  if(document.getElementById('copyMonday').checked){\n";
-    html += "    var enabled=document.getElementById('enabled0').checked;\n";
-    html += "    var time=document.getElementById('time0').value;\n";
-    html += "    var vol=document.getElementById('vol0').value;\n";
-    html += "    for(var i=1;i<7;i++){\n";
-    html += "      document.getElementById('enabled'+i).disabled=false;\n";
-    html += "      document.getElementById('time'+i).disabled=false;\n";
-    html += "      document.getElementById('vol'+i).disabled=false;\n";
-    html += "      document.getElementById('enabled'+i).checked=enabled;\n";
-    html += "      document.getElementById('time'+i).value=time;\n";
-    html += "      document.getElementById('vol'+i).value=vol;\n";
-    html += "    }\n";
-    html += "  }\n";
-    html += "});\n";
-    html += "document.getElementById('cancelBtn').addEventListener('click',function(){\n";
-    html += "  var url = new URL(window.location.href);\n";
-    html += "  var channel = url.searchParams.get('channel') || '1';\n";
-    html += "  window.location.href = '/newUI/manageChannel?channel=' + channel;\n";
-    html += "});\n";
-    html += "</script>\n";
-    html += "</form></body></html>";
-    server.send(200, "text/html", html);
+    // After table
+    chunk = "</table>";
+    chunk += "<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>";
+    chunk += String("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'") + (ws->missedDoseCompensation ? " checked" : "") + "><label for='missedDose'>Missed Dose Compensation</label></div>";
+    chunk += "<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>";
+    chunk += "<button type='submit' style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;'>Save</button>";
+    chunk += "<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;'>Cancel</button>";
+    chunk += "</div>";
+    chunk += "</form>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    // Footer and scripts
+    chunk = generateFooter();
+    chunk += "<script>\n";
+    chunk += "document.getElementById('scheduleForm').addEventListener('submit',function(e){\n";
+    chunk += "  if(document.getElementById('copyMonday').checked){\n";
+    chunk += "    var enabled=document.getElementById('enabled0').checked;\n";
+    chunk += "    var time=document.getElementById('time0').value;\n";
+    chunk += "    var vol=document.getElementById('vol0').value;\n";
+    chunk += "    for(var i=1;i<7;i++){document.getElementById('enabled'+i).disabled=false;document.getElementById('time'+i).disabled=false;document.getElementById('vol'+i).disabled=false;document.getElementById('enabled'+i).checked=enabled;document.getElementById('time'+i).value=time;document.getElementById('vol'+i).value=vol;}\n";
+    chunk += "  }\n";
+    chunk += "});\n";
+    chunk += "document.getElementById('cancelBtn').addEventListener('click',function(){\n";
+    chunk += "  var url = new URL(window.location.href);\n";
+    chunk += "  var channel = url.searchParams.get('channel') || '1';\n";
+    chunk += "  window.location.href = '/newUI/manageChannel?channel=' + channel;\n";
+    chunk += "});\n";
+    chunk += "</script>\n";
+    chunk += "</form></body></html>";
+    server.sendContent(chunk);
+    // End chunked response
+    server.sendContent("");
   });
+
   server.on("/newUI/manageSchedule", HTTP_POST, []() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
@@ -1202,6 +1403,57 @@ void setupWebServer() {
     saveWeeklySchedulesToSPIFFS();
     server.sendHeader("Location", "/newUI/manageChannel?channel=" + String(channel));
     server.send(302, "text/plain", "");
+  });
+
+  server.on("/newUI/systemSettings", HTTP_GET, []() {
+    // Get MAC address for default device name
+    String mac = WiFi.macAddress();
+    mac.replace(":", "");
+    String defaultDeviceName = "Doser_" + mac;
+    // Load current values (replace with actual persistent values if available)
+    String deviceName = defaultDeviceName;
+  
+    String mqttUser = ""; // Add persistent value if available
+    String mqttPass = ""; // Add persistent value if available
+    String ntfyChannel = ""; // Add persistent value if available
+    bool notifyLowFert = true;
+    bool notifyStart = false;
+    bool notifyDose = false;
+    // Calibration factors
+    float calib1 = calibrationFactor1;
+    float calib2 = calibrationFactor2;
+    // Timezone dropdown HTML (reuse from /timezone)
+    String tzDropdown = "<select name='timezone'>";
+    int tzOffsets[] = {-43200,-39600,-36000,-32400,-28800,-25200,-21600,-18000,-14400,-10800,-7200,-3600,0,3600,7200,10800,14400,18000,19800,21600,25200,28800,32400,36000,39600,43200};
+    String tzLabels[] = {"UTC-12:00","UTC-11:00","UTC-10:00","UTC-09:00","UTC-08:00 (PST)","UTC-07:00 (MST)","UTC-06:00 (CST)","UTC-05:00 (EST)","UTC-04:00","UTC-03:00","UTC-02:00","UTC-01:00","UTC+00:00","UTC+01:00","UTC+02:00","UTC+03:00","UTC+04:00","UTC+05:00","UTC+05:30 (IST)","UTC+06:00","UTC+07:00","UTC+08:00","UTC+09:00 (JST)","UTC+10:00","UTC+11:00","UTC+12:00"};
+    for (int i = 0; i < 26; ++i) {
+      tzDropdown += "<option value='" + String(tzOffsets[i]) + "'" + (timezoneOffset == tzOffsets[i] ? " selected" : "") + ">" + tzLabels[i] + "</option>";
+    }
+    tzDropdown += "</select>";
+    String html = "<html><head><title>System Settings</title>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} label{display:block;margin-bottom:6px;font-weight:500;} input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} .section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} .checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} .btn-row{display:flex;gap:10px;margin-top:18px;} .btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} .btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} .btn:hover{background:#0056b3;} .btn.cancel:hover{background:#888;} .btn.danger:hover{background:#b30000;} .btn.update:hover{background:#218838;} </style>";
+    html += "</head><body>";
+    html += generateHeader("System Settings");
+    html += "<form method='POST' action='/newUI/systemSettings'>";
+    html += "<div class='card'>";
+    html += "<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='" + deviceName + "'></div>";
+    html += "<div class='form-row'><label for='timezone'>Time Zone:</label>" + tzDropdown + "</div>";
+    html += "<div class='section-title'>Calibration Factor</div>";
+    html += "<div class='form-row'>Channel 1: <input type='number' readonly value='" + String(calib1, 2) + "'></div>";
+    html += "<div class='form-row'>Channel 2: <input type='number' readonly value='" + String(calib2, 2) + "'></div>";
+     html += "<div class='section-title'>Notifications</div>";
+    html += "<div class='form-row'><label for='ntfyChannel'>NTFY Channel:</label><input type='text' id='ntfyChannel' name='ntfyChannel' value='" + ntfyChannel + "'></div>";
+    html += "<div class='form-row'>Events to Notify:</div>";
+    html += "<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert' checked><label for='notifyLowFert'>Low Fertilizer Volume</label></div>";
+    html += "<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart' " + String(notifyStart ? "checked" : "") + "><label for='notifyStart'>System Start</label></div>";
+    html += "<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose' " + String(notifyDose ? "checked" : "") + "><label for='notifyDose'>Dose</label></div>";
+    html += "<div class='btn-row'><button type='submit' class='btn'>Save</button><button type='button' class='btn cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button></div>";
+    html += "<div class='btn-row'><button type='button' class='btn update' onclick=\"location.reload()\">Firmware Update</button><button type='button' class='btn' onclick=\"location.href='/reset'\">Restart</button><button type='button' class='btn' onclick=\"location.href='/reset?wifi=1'\">WiFi Reset</button><button type='button' class='btn danger' onclick=\"if(confirm('Factory reset?'))location.href='/reset?factory=1'\">Factory Reset</button></div>";
+    html += "</div></form>";
+    html += generateFooter();
+    html += "</body></html>";
+    server.send(200, "text/html", html);
   });
 
   server.begin();
@@ -1278,7 +1530,7 @@ void handleManualDispense() {
     
     // Update ML and publish
     updateRemainingML(channel, ml);
-    publishLastDosed(channel, ml);
+   
 
     // Update last dispensed volume and time for the channel
     if (channel == 1) {
@@ -1352,7 +1604,7 @@ void checkDailyDispense() {
     int dispenseTime = channel1Schedule.ml * calibrationFactor1;
     runMotor(1, dispenseTime);
     updateRemainingML(1, channel1Schedule.ml);
-    publishLastDosed(1, channel1Schedule.ml);
+   
     lastDispenseHour1 = currentHour;
     lastDispenseMinute1 = currentMinute;
     lastDispensedVolume1 = channel1Schedule.ml;
@@ -1368,7 +1620,7 @@ void checkDailyDispense() {
     int dispenseTime = channel2Schedule.ml * calibrationFactor2;
     runMotor(2, dispenseTime);
     updateRemainingML(2, channel2Schedule.ml);
-    publishLastDosed(2, channel2Schedule.ml);
+   
     lastDispenseHour2 = currentHour;
     lastDispenseMinute2 = currentMinute;
     lastDispensedVolume2 = channel2Schedule.ml;
@@ -1529,76 +1781,10 @@ void updateRemainingML(int channel, float dispensedML) {
   }
   savePersistentDataToSPIFFS();
 
-  // Publish updated remaining ML
-  publishRemainingML();
+ 
 }
 
-void setupMQTT() {
-  mqttClient.setServer(mqttServer, mqttPort);
-  mqttClient.setCallback(mqttCallback);
-}
 
-void handleMQTTConnection() {
-  if (!mqttClient.connected()) {
-    Serial.println("Attempting MQTT connection...");
-    if (mqttClient.connect("ESP8266Client")) {
-      Serial.println("Connected to MQTT");
-      mqttClient.subscribe(mqttTopicManualDose);
-    } else {
-      Serial.print("Failed MQTT connection, rc=");
-      Serial.println(mqttClient.state());
-    }
-  }
-}
-
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  String message;
-  for (unsigned int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
-
-  if (String(topic) == mqttTopicManualDose) {
-    DynamicJsonDocument doc(1024);
-    deserializeJson(doc, message);
-    int channel = doc["channel"];
-    float ml = doc["ml"];
-    float calibrationFactor = (channel == 1) ? calibrationFactor1 : calibrationFactor2;
-    
-    int dispenseTime = ml * calibrationFactor * 1000;
-    runMotor(channel, dispenseTime);
-    
-    updateRemainingML(channel, ml);
-    publishRemainingML();
-  }
-}
-
-void publishLastDosed(int channel, float ml) {
-  if (!mqttClient.connected()) return;
-  
-  DynamicJsonDocument doc(200);
-  doc["channel"] = (channel == 1) ? channel1Name : channel2Name;
-  doc["ml"] = ml;
-  doc["timestamp"] = getFormattedTime();
-  
-  char buffer[200];
-  serializeJson(doc, buffer);
-  mqttClient.publish(mqttTopicLastDosed, buffer);
-}
-
-void publishRemainingML() {
-  if (!mqttClient.connected()) return;
-  
-  DynamicJsonDocument doc(200);
-  JsonObject ch1 = doc.createNestedObject(channel1Name);
-  ch1["ml"] = remainingMLChannel1;
-  
-  JsonObject ch2 = doc.createNestedObject(channel2Name);
-  ch2["ml"] = remainingMLChannel2;
-  
-  char buffer[200];
-  serializeJson(doc, buffer);
-  mqttClient.publish(mqttTopicRemainingML, buffer);
-}
 
 void handleSystemReset() {
   // Reset system settings
@@ -1769,6 +1955,7 @@ String generateHeader(String title) {
 String generateFooter() {
   String html = "<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>";
   html += "S/W version : 1.0  Support : mymail.arjun@gmail.com";
+  html += "<br>Available RAM: " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB";
   html += "</div>";
   return html;
 }
