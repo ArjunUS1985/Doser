@@ -92,7 +92,6 @@ void setLEDState(LEDState state) {
 
 // Global Variables
 ESP8266WebServer server(80);
-Ticker ledTicker;
 
 // Channel names
 String channel1Name = "Channel 1";
@@ -102,15 +101,6 @@ String channel2Name = "Channel 2";
 float calibrationFactor1 = 1;
 float calibrationFactor2 = 1;
 
-struct DailySchedule {
-  int hour;
-  int minute;
-  float ml;
-};
-
-DailySchedule channel1Schedule = {0, 0, 0.0};
-DailySchedule channel2Schedule = {0, 0, 0.0};
-
 // Persistent Storage Variables
 float remainingMLChannel1 = 0.0;
 float remainingMLChannel2 = 0.0;
@@ -118,11 +108,6 @@ float remainingMLChannel2 = 0.0;
 // Add timezone offset to global variables
 int32_t timezoneOffset = 0;  // Default to UTC
 
-// Add these variables after other global declarations
-int lastDispenseHour1 = -1;
-int lastDispenseMinute1 = -1;
-int lastDispenseHour2 = -1;
-int lastDispenseMinute2 = -1;
 // Add last dispensed volume and time string for each channel
 float lastDispensedVolume1 = 0.0;
 float lastDispensedVolume2 = 0.0;
@@ -1029,12 +1014,9 @@ void setupWebServer() {
     }
     // Select channel-specific variables
     String channelName = (channel == 1) ? channel1Name : channel2Name;
-    int lastDispenseHour = (channel == 1) ? lastDispenseHour1 : lastDispenseHour2;
-    int lastDispenseMinute = (channel == 1) ? lastDispenseMinute1 : lastDispenseMinute2;
     float lastDispensedVolume = (channel == 1) ? lastDispensedVolume1 : lastDispensedVolume2;
     String lastDispensedTime = (channel == 1) ? lastDispensedTime1 : lastDispensedTime2;
     float remainingML = (channel == 1) ? remainingMLChannel1 : remainingMLChannel2;
-    DailySchedule schedule = (channel == 1) ? channel1Schedule : channel2Schedule;
     
     // Start chunked response
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -1559,12 +1541,6 @@ void handleDailyDispense() {
     int minute = server.arg("minute").toInt();
     float ml = server.arg("ml").toFloat();
 
-    if (channel == 1) {
-      channel1Schedule = {hour, minute, ml};
-    } else if (channel == 2) {
-      channel2Schedule = {hour, minute, ml};
-    }
-
     // Save the updated schedule
     savePersistentDataToSPIFFS();
 
@@ -1583,17 +1559,6 @@ void checkDailyDispense() {
   bool runCh1 = false;
   bool runCh2 = false;
   
-  // Check both channels first
-  if (currentHour == channel1Schedule.hour && currentMinute == channel1Schedule.minute &&
-      (currentHour != lastDispenseHour1 || currentMinute != lastDispenseMinute1)) {
-    runCh1 = true;
-  }
-  
-  if (currentHour == channel2Schedule.hour && currentMinute == channel2Schedule.minute &&
-      (currentHour != lastDispenseHour2 || currentMinute != lastDispenseMinute2)) {
-    runCh2 = true;
-  }
-  
   // If both channels need to run, indicate this with LED
   if (runCh1 && runCh2) {
     blinkLED(LED_PURPLE, 2);  // Blink purple twice to indicate dual channel operation
@@ -1601,13 +1566,9 @@ void checkDailyDispense() {
   
   // Run channel 1 if needed
   if (runCh1) {
-    int dispenseTime = channel1Schedule.ml * calibrationFactor1;
-    runMotor(1, dispenseTime);
-    updateRemainingML(1, channel1Schedule.ml);
+    updateRemainingML(1, 0);
    
-    lastDispenseHour1 = currentHour;
-    lastDispenseMinute1 = currentMinute;
-    lastDispensedVolume1 = channel1Schedule.ml;
+    lastDispensedVolume1 = 0;
     lastDispensedTime1 = getFormattedTime();
     Serial.print("[SCHEDULED DOSE] lastDispensedVolume1 set: "); Serial.println(lastDispensedVolume1);
     Serial.print("[SCHEDULED DOSE] lastDispensedTime1 set: "); Serial.println(lastDispensedTime1);
@@ -1617,13 +1578,9 @@ void checkDailyDispense() {
   
   // Run channel 2 if needed
   if (runCh2) {
-    int dispenseTime = channel2Schedule.ml * calibrationFactor2;
-    runMotor(2, dispenseTime);
-    updateRemainingML(2, channel2Schedule.ml);
+    updateRemainingML(2, 0);
    
-    lastDispenseHour2 = currentHour;
-    lastDispenseMinute2 = currentMinute;
-    lastDispensedVolume2 = channel2Schedule.ml;
+    lastDispensedVolume2 = 0;
     lastDispensedTime2 = getFormattedTime();
     Serial.print("[SCHEDULED DOSE] lastDispensedVolume2 set: "); Serial.println(lastDispensedVolume2);
     Serial.print("[SCHEDULED DOSE] lastDispensedTime2 set: "); Serial.println(lastDispensedTime2);
@@ -1682,20 +1639,6 @@ void loadPersistentDataFromSPIFFS() {
   calibrationFactor1 = doc["calibration1"] | 1.0f;  // Default to 1 if not set
   calibrationFactor2 = doc["calibration2"] | 1.0f;  // Default to 1 if not set
 
-  // Load schedule for channel 1
-  if (doc.containsKey("schedule1")) {
-    channel1Schedule.hour = doc["schedule1"]["hour"] | 0;
-    channel1Schedule.minute = doc["schedule1"]["minute"] | 0;
-    channel1Schedule.ml = doc["schedule1"]["ml"] | 0.0f;
-  }
-
-  // Load schedule for channel 2
-  if (doc.containsKey("schedule2")) {
-    channel2Schedule.hour = doc["schedule2"]["hour"] | 0;
-    channel2Schedule.minute = doc["schedule2"]["minute"] | 0;
-    channel2Schedule.ml = doc["schedule2"]["ml"] | 0.0f;
-  }
-
   // Load last dispensed volume and time
   lastDispensedVolume1 = doc["lastDispensedVolume1"] | 0.0f;
   lastDispensedTime1 = doc["lastDispensedTime1"] | "N/A";
@@ -1728,18 +1671,6 @@ void savePersistentDataToSPIFFS() {
   // Save calibration factors
   doc["calibration1"] = calibrationFactor1;
   doc["calibration2"] = calibrationFactor2;
-
-  // Save schedule for channel 1
-  JsonObject schedule1 = doc.createNestedObject("schedule1");
-  schedule1["hour"] = channel1Schedule.hour;
-  schedule1["minute"] = channel1Schedule.minute;
-  schedule1["ml"] = channel1Schedule.ml;
-
-  // Save schedule for channel 2
-  JsonObject schedule2 = doc.createNestedObject("schedule2");
-  schedule2["hour"] = channel2Schedule.hour;
-  schedule2["minute"] = channel2Schedule.minute;
-  schedule2["ml"] = channel2Schedule.ml;
 
   // Save last dispensed volume and time
   doc["lastDispensedVolume1"] = lastDispensedVolume1;
