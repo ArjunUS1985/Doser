@@ -21,10 +21,17 @@ String getFormattedTime() {
   timeClient.update();
   time_t epochTime = timeClient.getEpochTime();
   struct tm *ptm = gmtime ((time_t *)&epochTime);
-  char timeString[32];  // Buffer of 32 bytes
-  snprintf(timeString, sizeof(timeString), "%02d:%02d:%02d %02d/%02d/%04d", 
-          ptm->tm_hour, ptm->tm_min, ptm->tm_sec,
-          ptm->tm_mday, ptm->tm_mon+1, ptm->tm_year+1900);
+  static const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+  int hour = ptm->tm_hour;
+  int minute = ptm->tm_min;
+  int day = ptm->tm_mday;
+  int month = ptm->tm_mon;
+  int year = ptm->tm_year + 1900;
+  String ampm = (hour < 12) ? "AM" : "PM";
+  int hour12 = hour % 12;
+  if (hour12 == 0) hour12 = 12;
+  char timeString[32];
+  snprintf(timeString, sizeof(timeString), "%02d-%s-%04d %02d:%02d %s", day, months[month], year, hour12, minute, ampm.c_str());
   return String(timeString);
 }
 
@@ -309,6 +316,10 @@ void setup() {
   // Load Persistent Data from SPIFFS
   loadPersistentDataFromSPIFFS();
   loadWeeklySchedulesFromSPIFFS();
+  Serial.print("[BOOT] lastDispensedVolume1: "); Serial.println(lastDispensedVolume1);
+  Serial.print("[BOOT] lastDispensedTime1: "); Serial.println(lastDispensedTime1);
+  Serial.print("[BOOT] lastDispensedVolume2: "); Serial.println(lastDispensedVolume2);
+  Serial.print("[BOOT] lastDispensedTime2: "); Serial.println(lastDispensedTime2);
 
   // Setup WiFi
   setupWiFi();
@@ -431,7 +442,7 @@ void setupWebServer() {
     String channelName = (channel == 1) ? channel1Name : channel2Name;
     String html = "<html><head><title>Calibrate</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} .calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .calib-btn:disabled{background:#aaa;cursor:not-allowed;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} #countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} </style>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} .calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .calib-btn:disabled{background:#aaa;cursor:not-allowed;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} #countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
     html += "<script>\n";
     html += "function startCountdown() {\n";
     html += "  var btn = document.getElementById('calibBtn');\n";
@@ -480,7 +491,7 @@ void setupWebServer() {
   server.on("/manual", HTTP_GET, []() {
     String html = "<html><head><title>Manual Dispense</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .dispense-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} </style>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .dispense-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
     html += "</head><body>";
     html += generateHeader("Manual Dispense");
     html += "<div class='card'>";
@@ -667,7 +678,7 @@ void setupWebServer() {
     String html = "<html><head>";
     html += "<title>Prime Pump</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } .card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } .prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } .prime-btn.stop { background: #28a745; } .prime-btn:active { opacity: 0.9; } .home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } .back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } </style>";
+    html += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } .card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } .prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } .prime-btn.stop { background: #28a745; } .prime-btn:active { opacity: 0.9; } .home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } .back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
     html += "<script>\n";
     html += "function togglePrime() {\n";
     html += "  var btn = document.getElementById('primeButton');\n";
@@ -747,9 +758,13 @@ void setupWebServer() {
   });
 
   server.on("/newUI/summary", HTTP_GET, []() {
+    Serial.print("[SUMMARY] lastDispensedVolume1: "); Serial.println(lastDispensedVolume1);
+    Serial.print("[SUMMARY] lastDispensedTime1: "); Serial.println(lastDispensedTime1);
+    Serial.print("[SUMMARY] lastDispensedVolume2: "); Serial.println(lastDispensedVolume2);
+    Serial.print("[SUMMARY] lastDispensedTime2: "); Serial.println(lastDispensedTime2);
     String html = "<html><head><title>Dosing Summary</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; }</style></head><body>";
+    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>";
     html += generateHeader("Dosing Summary");
     // Channel 1 Summary
     int daysRemaining1 = 0;
@@ -780,6 +795,9 @@ void setupWebServer() {
     if (moreThanYear1) html += "More than a year";
     else html += String(simulatedDays1);
     html += "</p>";
+    html += "<div id='manualDoseSection1'>";
+    html += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>";
+    html += "</div>";
     html += "<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>";
     html += "</div>";
     // Channel 2 Summary
@@ -811,15 +829,74 @@ void setupWebServer() {
     if (moreThanYear2) html += "More than a year";
     else html += String(simulatedDays2);
     html += "</p>";
+    html += "<div id='manualDoseSection2'>";
+    html += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>";
+    html += "</div>";
     html += "<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>";
     html += "</div>";
     // System Time and Actions
     html += "<div class='card'>";
-    html += "<button onclick=\"location.href='/newUI/manualDose'\">Manual Dose</button>";
     html += "<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>";
     html += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>" + getFormattedTime() + "</span></div>";
     html += "</div>";
+    // REMOVE the last Manual Dose button outside the cards (do not add it here)
     html += generateFooter();
+    html += "<script>\n";
+    html += "function showManualDose1() {\n";
+    html += "  var s = document.getElementById('manualDoseSection1');\n";
+    html += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
+    html += "}\n";
+    html += "function showManualDose2() {\n";
+    html += "  var s = document.getElementById('manualDoseSection2');\n";
+    html += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol2' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow2()'>Dose</button><button id='cancelBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose2()'>Cancel</button></div><div id='doseCountdown2' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
+    html += "}\n";
+    html += "function cancelManualDose1() {\n";
+    html += "  var s = document.getElementById('manualDoseSection1');\n";
+    html += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>`;\n";
+    html += "}\n";
+    html += "function cancelManualDose2() {\n";
+    html += "  var s = document.getElementById('manualDoseSection2');\n";
+    html += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>`;\n";
+    html += "}\n";
+    html += "function doseNow1() {\n";
+    html += "  var vol = parseFloat(document.getElementById('doseVol1').value);\n";
+    html += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
+    html += "  var btn = document.getElementById('doseBtn1');\n";
+    html += "  var cancel = document.getElementById('cancelBtn1');\n";
+    html += "  btn.disabled = true; cancel.disabled = true;\n";
+    html += "  var countdown = document.getElementById('doseCountdown1');\n";
+    html += "  var duration = Math.ceil(vol * " + String(calibrationFactor1) + " / 1000);\n";
+    html += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    html += "  var interval = setInterval(function() {\n";
+    html += "    duration--;\n";
+    html += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    html += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
+    html += "  }, 1000);\n";
+    html += "  var xhr = new XMLHttpRequest();\n";
+    html += "  xhr.open('POST', '/manual', true);\n";
+    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    html += "  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n";
+    html += "}\n";
+    html += "function doseNow2() {\n";
+    html += "  var vol = parseFloat(document.getElementById('doseVol2').value);\n";
+    html += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
+    html += "  var btn = document.getElementById('doseBtn2');\n";
+    html += "  var cancel = document.getElementById('cancelBtn2');\n";
+    html += "  btn.disabled = true; cancel.disabled = true;\n";
+    html += "  var countdown = document.getElementById('doseCountdown2');\n";
+    html += "  var duration = Math.ceil(vol * " + String(calibrationFactor2) + " / 1000);\n";
+    html += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    html += "  var interval = setInterval(function() {\n";
+    html += "    duration--;\n";
+    html += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    html += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
+    html += "  }, 1000);\n";
+    html += "  var xhr = new XMLHttpRequest();\n";
+    html += "  xhr.open('POST', '/manual', true);\n";
+    html += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
+    html += "  xhr.send('channel=2&ml=' + encodeURIComponent(vol));\n";
+    html += "}\n";
+    html += "</script>\n";
     html += "</body></html>";
     server.send(200, "text/html", html);
   });
@@ -840,7 +917,7 @@ void setupWebServer() {
     
     String html = "<html><head><title>Channel Management: " + channelName + "</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } .rename-input { flex:1; padding:8px; font-size:1em; border-radius:4px; border:1px solid #ccc; } .rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } .rename-btn.cancel { background:#aaa; } </style>";
+    html += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } .card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } .card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } .card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } .header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } .rename-input { flex:1; padding:8px 12px; font-size:1em; border-radius:4px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; } .rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } .rename-btn.cancel { background:#aaa; } .rename-row { display:flex; gap:8px; align-items:center; justify-content:center; } .rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } .rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } .rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
     html += "<script>\n";
     html += "function showRenameBox() {\n";
     html += "  document.getElementById('rename-row').style.display = 'flex';\n";
@@ -907,13 +984,7 @@ void setupWebServer() {
     }
     html += "<div class='card'>";
     html += "<h2>Status</h2>";
-    if (lastDispenseHour < 0 || lastDispenseMinute < 0) {
-      html += "<p>Last Dosed: N/A</p>";
-    } else {
-      int lastHour12 = lastDispenseHour % 12 == 0 ? 12 : lastDispenseHour % 12;
-      String lastAmpm = lastDispenseHour < 12 ? "AM" : "PM";
-      html += "<p>Last Dosed: " + String(lastHour12) + ":" + (lastDispenseMinute < 10 ? "0" : "") + String(lastDispenseMinute) + " " + lastAmpm + "</p>";
-    }
+    html += "<p>Last Dosed: " + lastDispensedTime + "</p>";
     html += "<p>Last Volume: " + String(lastDispensedVolume) + " ml</p>";
     html += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (";
     if (moreThanYear) html += "More than a year";
@@ -974,10 +1045,14 @@ void setupWebServer() {
     html += "<input id='rename-input' class='rename-input' type='text' value='" + channelName + "'>";
     html += "<button class='rename-btn' onclick='saveRename(" + String(channel) + ")'>Save</button>";
     html += "<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>";
+    //html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+      
     html += "</div>";
     html += "</div>";
     // Add Back and Home buttons row (not on summary page)
     html += "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'><button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button></div>";
+    //html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
+      
     html += generateFooter();
     
     html += "</body></html>";
@@ -1025,7 +1100,7 @@ void setupWebServer() {
     WeeklySchedule* ws = (channel == 2) ? &weeklySchedule2 : &weeklySchedule1;
     String html = "<html><head><title>Manage Schedule: " + ws->channelName + "</title>";
     html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;}</style>";
+    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
     html += "<script>\n";
     html += "function copyMondayToOthers() {\n";
     html += "  var enabled=document.getElementById('enabled0').checked;\n";
@@ -1162,7 +1237,7 @@ void handleCalibration() {
       // Show form to input dispensed amount
       String html = "";
       html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-      html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-label{font-size:1.1em;margin-bottom:8px;display:block;} .calib-input{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;margin-bottom:16px;} .calib-submit{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} </style>";
+      html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-label{font-size:1.1em;margin-bottom:8px;display:block;} .calib-input{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;margin-bottom:16px;} .calib-submit{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
       html += "</head><body>";
       html += generateHeader("Calibration Measurement");
       html += "<div class='card'>";
@@ -1209,11 +1284,16 @@ void handleManualDispense() {
     if (channel == 1) {
       lastDispensedVolume1 = ml;
       lastDispensedTime1 = getFormattedTime();
+      Serial.print("[MANUAL DOSE] lastDispensedVolume1 set: "); Serial.println(lastDispensedVolume1);
+      Serial.print("[MANUAL DOSE] lastDispensedTime1 set: "); Serial.println(lastDispensedTime1);
     } else if (channel == 2) {
       lastDispensedVolume2 = ml;
       lastDispensedTime2 = getFormattedTime();
+      Serial.print("[MANUAL DOSE] lastDispensedVolume2 set: "); Serial.println(lastDispensedVolume2);
+      Serial.print("[MANUAL DOSE] lastDispensedTime2 set: "); Serial.println(lastDispensedTime2);
     }
-
+    savePersistentDataToSPIFFS();
+    Serial.println("[MANUAL DOSE] savePersistentDataToSPIFFS called");
     server.send(200, "application/json", "{\"status\":\"dispensed\"}");
   } else {
     server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
@@ -1277,6 +1357,10 @@ void checkDailyDispense() {
     lastDispenseMinute1 = currentMinute;
     lastDispensedVolume1 = channel1Schedule.ml;
     lastDispensedTime1 = getFormattedTime();
+    Serial.print("[SCHEDULED DOSE] lastDispensedVolume1 set: "); Serial.println(lastDispensedVolume1);
+    Serial.print("[SCHEDULED DOSE] lastDispensedTime1 set: "); Serial.println(lastDispensedTime1);
+    savePersistentDataToSPIFFS();
+    Serial.println("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 1");
   }
   
   // Run channel 2 if needed
@@ -1289,6 +1373,10 @@ void checkDailyDispense() {
     lastDispenseMinute2 = currentMinute;
     lastDispensedVolume2 = channel2Schedule.ml;
     lastDispensedTime2 = getFormattedTime();
+    Serial.print("[SCHEDULED DOSE] lastDispensedVolume2 set: "); Serial.println(lastDispensedVolume2);
+    Serial.print("[SCHEDULED DOSE] lastDispensedTime2 set: "); Serial.println(lastDispensedTime2);
+    savePersistentDataToSPIFFS();
+    Serial.println("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 2");
   }
 }
 
@@ -1356,6 +1444,12 @@ void loadPersistentDataFromSPIFFS() {
     channel2Schedule.ml = doc["schedule2"]["ml"] | 0.0f;
   }
 
+  // Load last dispensed volume and time
+  lastDispensedVolume1 = doc["lastDispensedVolume1"] | 0.0f;
+  lastDispensedTime1 = doc["lastDispensedTime1"] | "N/A";
+  lastDispensedVolume2 = doc["lastDispensedVolume2"] | 0.0f;
+  lastDispensedTime2 = doc["lastDispensedTime2"] | "N/A";
+
   file.close();
   Serial.println("Loaded configuration from filesystem");
 }
@@ -1394,6 +1488,12 @@ void savePersistentDataToSPIFFS() {
   schedule2["hour"] = channel2Schedule.hour;
   schedule2["minute"] = channel2Schedule.minute;
   schedule2["ml"] = channel2Schedule.ml;
+
+  // Save last dispensed volume and time
+  doc["lastDispensedVolume1"] = lastDispensedVolume1;
+  doc["lastDispensedTime1"] = lastDispensedTime1;
+  doc["lastDispensedVolume2"] = lastDispensedVolume2;
+  doc["lastDispensedTime2"] = lastDispensedTime2;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println("Failed to write JSON to file");
