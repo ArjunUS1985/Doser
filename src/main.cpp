@@ -2,7 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
-#include <Ticker.h>
+//#include <Ticker.h>
 #include <NTPClient.h>
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
@@ -97,6 +97,9 @@ ESP8266WebServer server(80);
 String channel1Name = "Channel 1";
 String channel2Name = "Channel 2";
 
+// System Settings Variables
+String deviceName = "";
+
 // Calibration Variables
 float calibrationFactor1 = 1;
 float calibrationFactor2 = 1;
@@ -133,12 +136,16 @@ void savePersistentDataToSPIFFS();
 void handleBottleTracking();
 void updateRemainingML(int channel, float dispensedML);
 
-void handleSystemReset();
+//void handleSystemReset();
 void setupOTA();
 void blinkLED(uint32_t color, int times);
 void runMotor(int channel, int durationMs);
 void updateLEDState();
 String getFormattedTime(); 
+void handleRestartOnly();
+void handleWiFiReset();
+void handleFactoryReset();
+void handleSystemSettingsSave();
 
 // --- Weekly Schedule Data Structure ---
 struct DaySchedule {
@@ -302,8 +309,7 @@ void setup() {
   // Setup Time Sync
   setupTimeSync();
 
-  // Setup MQTT
-  //setupMQTT();
+
 
   // Initialize OTA
   setupOTA();
@@ -323,9 +329,8 @@ void loop() {
   // Handle Web Server
   server.handleClient();
 
-  // Handle MQTT
-  //mqttClient.loop();
-  //handleMQTTConnection();
+
+
 
   // Handle OTA
   ArduinoOTA.handle();
@@ -388,25 +393,7 @@ void setupWiFi() {
 }
 
 void setupWebServer() {
- // server.on("/", HTTP_GET, []() {
- //   String html = "<html><head>";
- //   html += "<title>Doser Control</title>";
- //   html += "<meta http-equiv='refresh' content='5'>"; // Refresh page every 5 seconds
- //   html += "</head><body>";
- //   html += "<h1>Doser Control</h1>";
- //   html += "<h2>Current Time: " + getFormattedTime() + "</h2>";
- //   html += "<p><a href='/names'>Set Channel Names</a></p>";
- //   html += "<p><a href='/calibrate'>Calibrate</a></p>";
- //   html += "<p><a href='/manual'>Manual Dispense</a></p>";
- //   html += "<p><a href='/daily'>Set Daily Schedule</a></p>";
- //   html += "<p><a href='/bottle'>Set Bottle Capacity</a></p>";
- //   html += "<p><a href='/prime'>Prime Pump</a></p>";  // Added Prime Pump link
- //   html += "<p><a href='/timezone'>Set Timezone</a></p>";
- //   html += "<p><a href='/view'>View Parameters</a></p>";
- //   html += "<p><a href='/reset'>System Reset</a></p>";
- //   html += "</body></html>";
- //   server.send(200, "text/html", html);
- // });
+ 
 
   server.on("/calibrate", HTTP_GET, []() {
     int channel = 1;
@@ -501,84 +488,7 @@ void setupWebServer() {
     server.sendContent("");
   });
 
-  //server.on("/manual", HTTP_GET, []() {
-  //  String html = "<html><head><title>Manual Dispense</title>";
-  //  html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-  //  html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .dispense-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-  //  html += "</head><body>";
-  //  html += generateHeader("Manual Dispense");
-  //  html += "<div class='card'>";
-  //  html += "<h2>Manual Dispense</h2>";
-  //  html += "<form action='/manual' method='POST'>";
-  //  html += "<label for='channel'>Channel:</label>";
-  //  html += "<select name='channel'>";
-  //  html += "<option value='1'>" + channel1Name + "</option>";
-  //  html += "<option value='2'>" + channel2Name + "</option>";
-  //  html += "</select><br><br>";
-  //  html += "<label for='ml'>Amount (ml):</label>";
-  //  html += "<input type='number' name='ml' step='0.1'><br><br>";
-  //  html += "<button type='submit' class='dispense-btn'>Dispense</button>";
-  //  html += "</form>";
-  //  html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-  //  html += "<button class='back-btn' onclick=\"history.back()\">Back</button>";
-  //  html += "</div>";
-  //  html += generateFooter();
-  //  html += "</body></html>";
-  //  server.send(200, "text/html", html);
-  //});
-
-  //server.on("/daily", HTTP_GET, []() {
-  //  String html = "<html><head><title>Set Daily Schedule</title></head><body>";
-  //  html += "<h1>Set Daily Schedule</h1>";
-  //  
-  //  // Show current schedules
-  //  html += "<h2>Current Schedules:</h2>";
-  //  html += "<p>" + channel1Name + ": " + String(channel1Schedule.hour) + ":" + 
-  //          String(channel1Schedule.minute, 2) + " - " + String(channel1Schedule.ml) + "ml</p>";
-  //  html += "<p>" + channel2Name + ": " + String(channel2Schedule.hour) + ":" + 
-  //          String(channel2Schedule.minute, 2) + " - " + String(channel2Schedule.ml) + "ml</p>";
-  //  
-  //  // Form to set new schedule
-  //  html += "<h2>Set New Schedule:</h2>";
-  //  html += "<form action='/daily' method='POST'>";
-  //  html += "<label for='channel'>Channel:</label>";
-  //  html += "<select name='channel'>";
-  //  html += "<option value='1'>" + channel1Name + "</option>";
-  //  html += "<option value='2'>" + channel2Name + "</option>";
-  //  html += "</select><br><br>";
-  //  html += "<label for='hour'>Hour:</label>";
-  //  html += "<input type='number' name='hour' min='0' max='23'><br><br>";
-  //  html += "<label for='minute'>Minute:</label>";
-  //  html += "<input type='number' name='minute' min='0' max='59'><br><br>";
-  //  html += "<label for='ml'>Amount (ml):</label>";
-  //  html += "<input type='number' name='ml' step='0.1'><br><br>";
-  //  html += "<input type='submit' value='Set Schedule'>";
-  //  html += "</form>";
-  //  html += "<p><a href='/'>Back to Home</a></p>";
-  //  html += "</body></html>";
-  //  server.send(200, "text/html", html);
-  //});
-
- // server.on("/bottle", HTTP_GET, []() {
- //   String html = "<html><head><title>Set Bottle Capacity</title></head><body>";
- //   html += "<h1>Set Bottle Capacity</h1>";
- //   html += "<form action='/bottle' method='POST'>";
- //   html += "<label for='channel'>Channel:</label>";
- //   html += "<select name='channel'>";
- //   html += "<option value='1'>" + channel1Name + "</option>";
- //   html += "<option value='2'>" + channel2Name + "</option>";
- //   html += "</select><br><br>";
- //   html += "<label for='ml'>Capacity (ml):</label>";
- //   html += "<input type='number' name='ml' step='0.1'><br><br>";
- //   html += "<input type='submit' value='Set Capacity'>";
- //   html += "</form>";
- //   html += "<p>Current Levels:</p>";
- //   html += "<p>" + channel1Name + ": " + String(remainingMLChannel1) + " ml</p>";
- //   html += "<p>" + channel2Name + ": " + String(remainingMLChannel2) + " ml</p>";
- //   html += "<p><a href='/'>Back to Home</a></p>";
- //   html += "</body></html>";
- //   server.send(200, "text/html", html);
- // });
+  
 
   server.on("/reset", HTTP_GET, []() {
     String html = "<html><head><title>System Reset</title></head><body>";
@@ -592,79 +502,7 @@ void setupWebServer() {
     server.send(200, "text/html", html);
   });
 
- // server.on("/view", HTTP_GET, []() {
- //   String html = "<html><head>";
- //   html += "<title>View Parameters</title>";
- //   html += "<meta http-equiv='refresh' content='5'>";
- //   html += "</head><body>";
- //   html += "<h1>Current Parameters</h1>";
- //   
- //   // Display Channel Names
- //   html += "<h2>Channel Names</h2>";
- //   html += "<p>" + channel1Name + " (Channel 1)</p>";
- //   html += "<p>" + channel2Name + " (Channel 2)</p>";
- //   
- //   // Display Remaining ML
- //   html += "<h2>Remaining Liquid</h2>";
- //   html += "<p>" + channel1Name + ": " + String(remainingMLChannel1) + "ml</p>";
- //   html += "<p>" + channel2Name + ": " + String(remainingMLChannel2) + "ml</p>";
- //   
- //   // Display Daily Schedule
- //   html += "<h2>Daily Schedule</h2>";
- //   html += "<p>" + channel1Name + ": " + String(channel1Schedule.hour) + ":" + 
- //           String(channel1Schedule.minute) + " - " + String(channel1Schedule.ml) + "ml</p>";
- //   html += "<p>" + channel2Name + ": " + String(channel2Schedule.hour) + ":" + 
- //           String(channel2Schedule.minute) + " - " + String(channel2Schedule.ml) + "ml</p>";
- //   
- //   // Display Last Dispense Info
- //   html += "<h2>Last Dispense</h2>";
- //   html += "<p>" + channel1Name + ": " + String(lastDispensedVolume1) + "ml at " + lastDispensedTime1 + "</p>";
- //   html += "<p>" + channel2Name + ": " + String(lastDispensedVolume2) + "ml at " + lastDispensedTime2 + "</p>";
- //   
- //   html += "<p><a href='/'>Back to Home</a></p>";
- //   html += "</body></html>";
- //   server.send(200, "text/html", html);
- // });
-
-  server.on("/timezone", HTTP_GET, []() {
-    String html = "<html><head><title>Set Timezone</title></head><body>";
-    html += "<h1>Set Timezone</h1>";
-    html += "<form action='/timezone' method='POST'>";
-    html += "<label for='offset'>Timezone offset (in seconds):</label><br>";
-    html += "<select name='offset'>";
-    html += "<option value='-43200'" + String((timezoneOffset == -43200) ? " selected" : "") + ">UTC-12:00</option>";
-    html += "<option value='-39600'" + String((timezoneOffset == -39600) ? " selected" : "") + ">UTC-11:00</option>";
-    html += "<option value='-36000'" + String((timezoneOffset == -36000) ? " selected" : "") + ">UTC-10:00</option>";
-    html += "<option value='-32400'" + String((timezoneOffset == -32400) ? " selected" : "") + ">UTC-09:00</option>";
-    html += "<option value='-28800'" + String((timezoneOffset == -28800) ? " selected" : "") + ">UTC-08:00 (PST)</option>";
-    html += "<option value='-25200'" + String((timezoneOffset == -25200) ? " selected" : "") + ">UTC-07:00 (MST)</option>";
-    html += "<option value='-21600'" + String((timezoneOffset == -21600) ? " selected" : "") + ">UTC-06:00 (CST)</option>";
-    html += "<option value='-18000'" + String((timezoneOffset == -18000) ? " selected" : "") + ">UTC-05:00 (EST)</option>";
-    html += "<option value='-14400'" + String((timezoneOffset == -14400) ? " selected" : "") + ">UTC-04:00</option>";
-    html += "<option value='-10800'" + String((timezoneOffset == -10800) ? " selected" : "") + ">UTC-03:00</option>";
-    html += "<option value='-7200'" + String((timezoneOffset == -7200) ? " selected" : "") + ">UTC-02:00</option>";
-    html += "<option value='-3600'" + String((timezoneOffset == -3600) ? " selected" : "") + ">UTC-01:00</option>";
-    html += "<option value='0'" + String((timezoneOffset == 0) ? " selected" : "") + ">UTC+00:00</option>";
-    html += "<option value='3600'" + String((timezoneOffset == 3600) ? " selected" : "") + ">UTC+01:00</option>";
-    html += "<option value='7200'" + String((timezoneOffset == 7200) ? " selected" : "") + ">UTC+02:00</option>";
-    html += "<option value='10800'" + String((timezoneOffset == 10800) ? " selected" : "") + ">UTC+03:00</option>";
-    html += "<option value='14400'" + String((timezoneOffset == 14400) ? " selected" : "") + ">UTC+04:00</option>";
-    html += "<option value='18000'" + String((timezoneOffset == 18000) ? " selected" : "") + ">UTC+05:00</option>";
-    html += "<option value='19800'" + String((timezoneOffset == 19800) ? " selected" : "") + ">UTC+05:30 (IST)</option>";
-    html += "<option value='21600'" + String((timezoneOffset == 21600) ? " selected" : "") + ">UTC+06:00</option>";
-    html += "<option value='25200'" + String((timezoneOffset == 25200) ? " selected" : "") + ">UTC+07:00</option>";
-    html += "<option value='28800'" + String((timezoneOffset == 28800) ? " selected" : "") + ">UTC+08:00</option>";
-    html += "<option value='32400'" + String((timezoneOffset == 32400) ? " selected" : "") + ">UTC+09:00 (JST)</option>";
-    html += "<option value='36000'" + String((timezoneOffset == 36000) ? " selected" : "") + ">UTC+10:00</option>";
-    html += "<option value='39600'" + String((timezoneOffset == 39600) ? " selected" : "") + ">UTC+11:00</option>";
-    html += "<option value='43200'" + String((timezoneOffset == 43200) ? " selected" : "") + ">UTC+12:00</option>";
-    html += "</select><br><br>";
-    html += "<input type='submit' value='Set Timezone'>";
-    html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
+ 
 
   server.on("/timezone", HTTP_POST, []() {
     if (server.hasArg("offset")) {
@@ -681,7 +519,7 @@ void setupWebServer() {
   server.on("/manual", HTTP_POST, handleManualDispense);
   //server.on("/daily", HTTP_POST, handleDailyDispense);
   //server.on("/bottle", HTTP_POST, handleBottleTracking);
-  server.on("/reset", HTTP_POST, handleSystemReset);
+  //server.on("/reset", HTTP_POST, handleSystemReset);
   server.on("/prime", HTTP_POST, handlePrimePump);
 
   server.on("/prime", HTTP_GET, []() {
@@ -702,8 +540,7 @@ void setupWebServer() {
     
     // CSS in chunks
     chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } ";
-    chunk += ".card h2 { margin-top: 0; color: #007BFF; } ";
-    chunk += ".prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } ";
+    chunk += ".card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } ";
     server.sendContent(chunk);
     
     chunk = ".prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } ";
@@ -762,51 +599,6 @@ void setupWebServer() {
     server.sendContent("");
   });
 
- // server.on("/names", HTTP_GET, []() {
- //   String html = "<html><head><title>Set Channel Names</title></head><body>";
- //   html += "<h1>Set Channel Names</h1>";
- //   html += "<form action='/names' method='POST'>";
- //   html += "<label for='name1'>Name for Channel 1:</label><br>";
- //   html += "<input type='text' name='name1' value='" + channel1Name + "'><br><br>";
- //   html += "<label for='name2'>Name for Channel 2:</label><br>";
- //   html += "<input type='text' name='name2' value='" + channel2Name + "'><br><br>";
- //   html += "<input type='submit' value='Set Names'>";
- //   html += "</form>";
- //   html += "<p><a href='/'>Back to Home</a></p>";
- //   html += "</body></html>";
- //   server.send(200, "text/html", html);
- // });
-
- // server.on("/names", HTTP_POST, []() {
- //   if (server.hasArg("name1") && server.hasArg("name2")) {
- //     channel1Name = server.arg("name1");
- //     channel2Name = server.arg("name2");
- //     savePersistentDataToSPIFFS();
- //     server.sendHeader("Location", "/");
- //     server.send(302, "text/plain", "");
- //   } else {
- //     server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
- //   }
- // });
-
- // // In setupWebServer() function, update the /bottleconfig endpoint
- // server.on("/bottleconfig", HTTP_GET, []() {
- //   String html = "<html><head><title>Bottle Configuration</title></head><body>";
- //   html += "<h1>Bottle Configuration</h1>";
- //   html += "<form action='/bottleconfig' method='POST'>";
- //   html += "<label for='channel'>Select Channel:</label>";
- //   html += "<select name='channel'>";
- //   html += "<option value='1'>" + channel1Name + "</option>";
- //   html += "<option value='2'>" + channel2Name + "</option>";
- //   html += "</select><br><br>";
- //   html += "<label for='capacity'>Bottle Capacity (ml):</label>";
- //   html += "<input type='number' name='capacity' step='0.1'><br><br>";
- //   html += "<input type='submit' value='Set Capacity'>";
- //   html += "</form>";
- //   html += "<p><a href='/'>Back to Home</a></p>";
- //   html += "</body></html>";
- //   server.send(200, "text/html", html);
- // });
 
   server.on("/newUI/summary", HTTP_GET, []() {
     Serial.print("[SUMMARY] lastDispensedVolume1: "); Serial.println(lastDispensedVolume1);
@@ -1392,51 +1184,223 @@ void setupWebServer() {
     String mac = WiFi.macAddress();
     mac.replace(":", "");
     String defaultDeviceName = "Doser_" + mac;
+    if (deviceName == "") deviceName = defaultDeviceName;
+    // Use global ntfyChannel
     // Load current values (replace with actual persistent values if available)
-    String deviceName = defaultDeviceName;
-  
-    String mqttUser = ""; // Add persistent value if available
-    String mqttPass = ""; // Add persistent value if available
-    String ntfyChannel = ""; // Add persistent value if available
     bool notifyLowFert = true;
     bool notifyStart = false;
     bool notifyDose = false;
     // Calibration factors
     float calib1 = calibrationFactor1;
     float calib2 = calibrationFactor2;
-    // Timezone dropdown HTML (reuse from /timezone)
-    String tzDropdown = "<select name='timezone'>";
+    
+    // Start chunked response
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "");
+    
+    // HTML head
+    String chunk = "<html><head><title>System Settings</title>";
+    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    chunk += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ";
+    server.sendContent(chunk);
+    
+    // CSS in chunks
+    chunk = ".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ";
+    chunk += ".card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} ";
+    chunk += "label{display:block;margin-bottom:6px;font-weight:500;} ";
+    server.sendContent(chunk);
+    
+    chunk = "input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} ";
+    chunk += ".section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} ";
+    server.sendContent(chunk);
+    
+    chunk = ".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} ";
+    chunk += ".btn-row{display:flex;gap:10px;margin-top:18px;} ";
+    chunk += ".btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} ";
+    server.sendContent(chunk);
+    
+    chunk = ".btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} ";
+    chunk += ".btn:hover{background:#0056b3;} .btn.cancel:hover{background:#888;} .btn.danger:hover{background:#b30000;} .btn.update:hover{background:#218838;} ";
+    server.sendContent(chunk);
+    
+    chunk = "</style></head><body>";
+    server.sendContent(chunk);
+    
+    // Header
+    chunk = generateHeader("System Settings");
+    server.sendContent(chunk);
+    
+    // Form start and device settings
+    chunk = "<form method='POST' action='/newUI/systemSettings'>";
+    chunk += "<div class='card'>";
+    chunk += "<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='" + deviceName + "'></div>";
+    server.sendContent(chunk);
+
+    // Timezone dropdown
+    chunk = "<div class='form-row'><label for='timezone'>Time Zone:</label><select name='timezone'>";
     int tzOffsets[] = {-43200,-39600,-36000,-32400,-28800,-25200,-21600,-18000,-14400,-10800,-7200,-3600,0,3600,7200,10800,14400,18000,19800,21600,25200,28800,32400,36000,39600,43200};
     String tzLabels[] = {"UTC-12:00","UTC-11:00","UTC-10:00","UTC-09:00","UTC-08:00 (PST)","UTC-07:00 (MST)","UTC-06:00 (CST)","UTC-05:00 (EST)","UTC-04:00","UTC-03:00","UTC-02:00","UTC-01:00","UTC+00:00","UTC+01:00","UTC+02:00","UTC+03:00","UTC+04:00","UTC+05:00","UTC+05:30 (IST)","UTC+06:00","UTC+07:00","UTC+08:00","UTC+09:00 (JST)","UTC+10:00","UTC+11:00","UTC+12:00"};
-    for (int i = 0; i < 26; ++i) {
-      tzDropdown += "<option value='" + String(tzOffsets[i]) + "'" + (timezoneOffset == tzOffsets[i] ? " selected" : "") + ">" + tzLabels[i] + "</option>";
+    server.sendContent(chunk);
+    
+    // Send timezone options in smaller chunks
+    for (int i = 0; i < 26; i += 5) {
+      chunk = "";
+      for (int j = i; j < i + 5 && j < 26; j++) {
+        chunk += "<option value='" + String(tzOffsets[j]) + "'" + (timezoneOffset == tzOffsets[j] ? " selected" : "") + ">" + tzLabels[j] + "</option>";
+      }
+      server.sendContent(chunk);
     }
-    tzDropdown += "</select>";
-    String html = "<html><head><title>System Settings</title>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} label{display:block;margin-bottom:6px;font-weight:500;} input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} .section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} .checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} .btn-row{display:flex;gap:10px;margin-top:18px;} .btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} .btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} .btn:hover{background:#0056b3;} .btn.cancel:hover{background:#888;} .btn.danger:hover{background:#b30000;} .btn.update:hover{background:#218838;} </style>";
-    html += "</head><body>";
-    html += generateHeader("System Settings");
-    html += "<form method='POST' action='/newUI/systemSettings'>";
-    html += "<div class='card'>";
-    html += "<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='" + deviceName + "'></div>";
-    html += "<div class='form-row'><label for='timezone'>Time Zone:</label>" + tzDropdown + "</div>";
-    html += "<div class='section-title'>Calibration Factor</div>";
-    html += "<div class='form-row'>Channel 1: <input type='number' readonly value='" + String(calib1, 2) + "'></div>";
-    html += "<div class='form-row'>Channel 2: <input type='number' readonly value='" + String(calib2, 2) + "'></div>";
-     html += "<div class='section-title'>Notifications</div>";
-    html += "<div class='form-row'><label for='ntfyChannel'>NTFY Channel:</label><input type='text' id='ntfyChannel' name='ntfyChannel' value='" + ntfyChannel + "'></div>";
-    html += "<div class='form-row'>Events to Notify:</div>";
-    html += "<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert' checked><label for='notifyLowFert'>Low Fertilizer Volume</label></div>";
-    html += "<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart' " + String(notifyStart ? "checked" : "") + "><label for='notifyStart'>System Start</label></div>";
-    html += "<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose' " + String(notifyDose ? "checked" : "") + "><label for='notifyDose'>Dose</label></div>";
-    html += "<div class='btn-row'><button type='submit' class='btn'>Save</button><button type='button' class='btn cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button></div>";
-    html += "<div class='btn-row'><button type='button' class='btn update' onclick=\"location.reload()\">Firmware Update</button><button type='button' class='btn' onclick=\"location.href='/reset'\">Restart</button><button type='button' class='btn' onclick=\"location.href='/reset?wifi=1'\">WiFi Reset</button><button type='button' class='btn danger' onclick=\"if(confirm('Factory reset?'))location.href='/reset?factory=1'\">Factory Reset</button></div>";
-    html += "</div></form>";
-    html += generateFooter();
-    html += "</body></html>";
-    server.send(200, "text/html", html);
+    
+    chunk = "</select></div>";
+    chunk += "<div class='section-title'>Calibration Factor</div>";
+    chunk += "<div class='form-row'>Channel 1: <span style='font-weight:600;'>" + String(calib1, 2) + "</span></div>";
+    chunk += "<div class='form-row'>Channel 2: <span style='font-weight:600;'>" + String(calib2, 2) + "</span></div>";
+    server.sendContent(chunk);
+    
+    // Notifications section
+    chunk = "<div class='section-title'>Notifications</div>";
+    // NTFY Channel as read-only, default to MAC if empty
+    String ntfyDefault = mac;
+    chunk += "<div class='form-row'><label for='ntfyChannel'>NTFY Channel:</label><input type='text' id='ntfyChannel' name='ntfyChannel' value='" + ntfyDefault + "' readonly></div>";
+    chunk += "<div class='form-row'>Events to Notify:</div>";
+    server.sendContent(chunk);
+    
+    chunk = "<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert' checked><label for='notifyLowFert'>Low Fertilizer Volume</label></div>";
+    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart' " + String(notifyStart ? "checked" : "") + "><label for='notifyStart'>System Start</label></div>";
+    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose' " + String(notifyDose ? "checked" : "") + "><label for='notifyDose'>Dose</label></div>";
+    server.sendContent(chunk);
+    
+    // Buttons
+    chunk = "<div class='btn-row'>";
+    chunk += "<button type='submit' class='btn btn-main'>Save</button>";
+    chunk += "<button type='button' class='btn btn-cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button>";
+    chunk += "</div></div></form>"; // Close main form and card
+    server.sendContent(chunk);
+
+    // Action buttons outside the main form
+    chunk = "<div class='btn-row card-action-row'>";
+    chunk += "<form style='display:inline;'><button type='button' class='btn btn-update' style='min-width:120px;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>";
+    chunk += "<form method='POST' action='/restart' style='display:inline;'><button type='submit' class='btn btn-main'>Restart</button></form>";
+    chunk += "<form method='POST' action='/wifiReset' style='display:inline;'><button type='submit' class='btn btn-danger' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>";
+    chunk += "<form method='POST' action='/factoryReset' style='display:inline;'><button type='submit' class='btn btn-danger' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+
+    // Update CSS for button consistency and centering
+    chunk = "<style> ";
+    chunk += ".btn-row.card-action-row { display: flex; justify-content: center; align-items: center; gap: 10px; max-width: 500px; margin: 0 auto 16px auto; } ";
+    chunk += ".btn-row.card-action-row .btn { flex: unset; min-width: 120px; } ";
+    chunk += ".btn { padding:12px 0; font-size:1.1em; border:none; border-radius:6px; cursor:pointer; transition:background 0.2s; min-width:120px; margin:0 4px 8px 0; } ";
+    chunk += ".btn-main { background:#007BFF; color:#fff; } ";
+    chunk += ".btn-cancel { background:#aaa; color:#fff; } ";
+    chunk += ".btn-danger { background:#dc3545; color:#fff; } ";
+    chunk += ".btn-update { background:#28a745; color:#fff; } ";
+    chunk += ".btn-main:hover { background:#0056b3; } ";
+    chunk += ".btn-cancel:hover { background:#888; } ";
+    chunk += ".btn-danger:hover { background:#b30000; } ";
+    chunk += ".btn-update:hover { background:#218838; } ";
+    chunk += "</style>";
+    server.sendContent(chunk);
+
+    // Firmware update section
+    chunk = "<div id='firmwareUpdateSection' style='display:none;margin-top:20px;'>";
+    chunk += "<div class='card'>";
+    chunk += "<h3>FW Update</h3>";
+    chunk += "<div class='form-row'><label for='firmwareUrl'>Firmware URL:</label>";
+    chunk += "<input type='text' id='firmwareUrl' value='ABC.com/fw.bin' style='width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;'></div>";
+    server.sendContent(chunk);
+    
+    chunk = "<div class='btn-row'>";
+    chunk += "<button type='button' class='btn btn-update' onclick=\"updateFirmware()\">Update</button>";
+    chunk += "<button type='button' class='btn btn-cancel' onclick=\"hideFirmwareUpdate()\">Cancel</button>";
+    chunk += "</div>";
+    server.sendContent(chunk);
+    
+    chunk = "<div id='updateProgress' style='margin-top:10px;display:none;'>";
+    chunk += "<div>Downloading firmware...</div>";
+    chunk += "<div id='progressBar' style='width:100%;background:#ddd;border-radius:6px;margin-top:5px;'>";
+    chunk += "<div id='progressFill' style='width:0%;height:20px;background:#007BFF;border-radius:6px;transition:width 0.3s;'></div>";
+    chunk += "</div><div id='progressText'>0%</div></div></div></div>";
+    server.sendContent(chunk);
+    
+    // JavaScript in smaller chunks
+    chunk = "<script>";
+    chunk += "function showFirmwareUpdate() {";
+    chunk += "  document.getElementById('firmwareUpdateSection').style.display = 'block';";
+    chunk += "}";
+    chunk += "function hideFirmwareUpdate() {";
+    chunk += "  document.getElementById('firmwareUpdateSection').style.display = 'none';";
+    chunk += "  document.getElementById('updateProgress').style.display = 'none';";
+    chunk += "}";
+    server.sendContent(chunk);
+    
+    chunk = "async function updateFirmware() {";
+    chunk += "  const url = document.getElementById('firmwareUrl').value;";
+    chunk += "  if (!url) { alert('Please enter firmware URL'); return; }";
+    chunk += "  document.getElementById('updateProgress').style.display = 'block';";
+    chunk += "  const progressFill = document.getElementById('progressFill');";
+    chunk += "  const progressText = document.getElementById('progressText');";
+    server.sendContent(chunk);
+    
+    chunk = "  try {";
+    chunk += "    const response = await fetch(url);";
+    chunk += "    if (!response.ok) throw new Error('Failed to download firmware');";
+    chunk += "    const contentLength = response.headers.get('content-length');";
+    chunk += "    const total = parseInt(contentLength, 10);";
+    chunk += "    let loaded = 0; const reader = response.body.getReader(); const chunks = [];";
+    server.sendContent(chunk);
+    
+    chunk = "    while (true) {";
+    chunk += "      const { done, value } = await reader.read();";
+    chunk += "      if (done) break;";
+    chunk += "      chunks.push(value); loaded += value.length;";
+    chunk += "      if (total) {";
+    chunk += "        const progress = (loaded / total) * 100;";
+    chunk += "        progressFill.style.width = progress + '%';";
+    chunk += "        progressText.textContent = Math.round(progress) + '%';";
+    chunk += "      }}";
+    server.sendContent(chunk);
+    
+    chunk = "    const firmwareData = new Uint8Array(loaded);";
+    chunk += "    let offset = 0;";
+    chunk += "    for (const chunk of chunks) {";
+    chunk += "      firmwareData.set(chunk, offset); offset += chunk.length;";
+    chunk += "    }";
+    chunk += "    progressText.textContent = 'Flashing firmware...';";
+    chunk += "    const formData = new FormData();";
+    chunk += "    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');";
+    server.sendContent(chunk);
+    
+    chunk = "    const uploadResponse = await fetch('/update', {";
+    chunk += "      method: 'POST', body: formData";
+    chunk += "    });";
+    chunk += "    if (uploadResponse.ok) {";
+    chunk += "      progressText.textContent = 'Firmware updated successfully! Device will restart...';";
+    chunk += "      setTimeout(() => { window.location.href = '/newUI/summary'; }, 3000);";
+    chunk += "    } else { throw new Error('Failed to flash firmware'); }";
+    server.sendContent(chunk);
+    
+    chunk = "  } catch (error) {";
+    chunk += "    alert('Firmware update failed: ' + error.message);";
+    chunk += "    hideFirmwareUpdate();";
+    chunk += "  }";
+    chunk += "}";
+    chunk += "</script>";
+    server.sendContent(chunk);
+    
+    // Footer
+    chunk = generateFooter();
+    chunk += "</body></html>";
+    server.sendContent(chunk);
+    
+    // End chunked response
+    server.sendContent("");
   });
+
+  server.on("/restart", HTTP_POST, handleRestartOnly);
+  server.on("/wifiReset", HTTP_POST, handleWiFiReset);
+  server.on("/factoryReset", HTTP_POST, handleFactoryReset);
+  server.on("/newUI/systemSettings", HTTP_POST, handleSystemSettingsSave);
 
   server.begin();
 }
@@ -1645,6 +1609,9 @@ void loadPersistentDataFromSPIFFS() {
   lastDispensedVolume2 = doc["lastDispensedVolume2"] | 0.0f;
   lastDispensedTime2 = doc["lastDispensedTime2"] | "N/A";
 
+  // Load device name
+  deviceName = doc["deviceName"] | "";
+
   file.close();
   Serial.println("Loaded configuration from filesystem");
 }
@@ -1677,6 +1644,9 @@ void savePersistentDataToSPIFFS() {
   doc["lastDispensedTime1"] = lastDispensedTime1;
   doc["lastDispensedVolume2"] = lastDispensedVolume2;
   doc["lastDispensedTime2"] = lastDispensedTime2;
+
+  // Save device name
+  doc["deviceName"] = deviceName;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println("Failed to write JSON to file");
@@ -1717,11 +1687,11 @@ void updateRemainingML(int channel, float dispensedML) {
 
 
 
-void handleSystemReset() {
-  // Reset system settings
-  LittleFS.remove("/data.json"); // Example reset logic
-  ESP.restart();
-}
+//void handleSystemReset() {
+//  // Reset system settings
+//  LittleFS.remove("/data.json"); // Example reset logic
+//  ESP.restart();
+//}
 
 void setupOTA() {
   ArduinoOTA.onStart([]() {
@@ -1889,5 +1859,65 @@ String generateFooter() {
   html += "<br>Available RAM: " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB";
   html += "</div>";
   return html;
+}
+
+void handleRestartOnly() {
+  
+ Serial.println("Restarting system...");
+
+  // Give browser time to receive response, then restart
+  delay(500);
+  ESP.restart();
+}
+
+void handleWiFiReset() {
+  // Clear WiFiManager credentials
+  WiFiManager wifiManager;
+  wifiManager.resetSettings();
+  
+  // Restart ESP to enter AP mode
+  ESP.restart();
+}
+
+void handleFactoryReset() {
+  // Format the entire filesystem to remove all files and orphans
+  LittleFS.format();
+  // Clear WiFiManager credentials
+  WiFiManager wifiManager;
+  wifiManager.resetSettings();
+  // Restart ESP
+  ESP.restart();
+}
+
+void handleSystemSettingsSave() {
+  bool updated = false;
+  
+  // Save timezone if provided
+  if (server.hasArg("timezone")) {
+    int newTimezone = server.arg("timezone").toInt();
+    if (newTimezone != timezoneOffset) {
+      timezoneOffset = newTimezone;
+      timeClient.setTimeOffset(timezoneOffset);
+      updated = true;
+    }
+  }
+  
+  // Save device name if provided
+  if (server.hasArg("deviceName")) {
+    String newDeviceName = server.arg("deviceName");
+    if (newDeviceName != deviceName) {
+      deviceName = newDeviceName;
+      updated = true;
+    }
+  }
+
+  // Save other settings here as needed (device name, NTFY settings, etc.)
+  
+  if (updated) {
+    savePersistentDataToSPIFFS();
+  }
+  // Redirect to summary page after saving
+  server.sendHeader("Location", "/newUI/summary");
+  server.send(302, "text/plain", "");
 }
 
