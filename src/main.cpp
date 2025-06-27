@@ -686,7 +686,14 @@ void setupWebServer() {
     }
     
     chunk += F("<div class='card'>");
-    chunk += F("<h2>") + channel1Name + F("</h2>");
+    chunk += F("<h2 style='display:flex;align-items:center;gap:8px;'>") + channel1Name;
+    if (!calibratedChannel1) {
+      chunk += F("<span class='status-chip chip-running-low'>Not Calibrated</span>");
+    }
+    if (!moreThanYear1 && simulatedDays1 <= 7) {
+      chunk += F("<span class='status-chip chip-running-low'>Running Low</span>");
+    }
+    chunk += F("</h2>");
     chunk += F("<p>Last Dosed Time: ") + lastDispensedTime1 + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume1) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel1) + F(" ml</p>");
@@ -727,7 +734,14 @@ void setupWebServer() {
     }
     
     chunk += F("<div class='card'>");
-    chunk += F("<h2>") + channel2Name + F("</h2>");
+    chunk += F("<h2 style='display:flex;align-items:center;gap:8px;'>") + channel2Name;
+    if (!calibratedChannel2) {
+      chunk += F("<span class='status-chip chip-running-low'>Not Calibrated</span>");
+    }
+    if (!moreThanYear2 && simulatedDays2 <= 7) {
+      chunk += F("<span class='status-chip chip-running-low'>Running Low</span>");
+    }
+    chunk += F("</h2>");
     chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
