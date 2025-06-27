@@ -10,6 +10,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <LittleFS.h>
 #include <ESP8266mDNS.h> // Include mDNS library
+#include <ESP8266HTTPClient.h>
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
 
 // Global variables that getFormattedTime needs
@@ -54,7 +55,7 @@ String getFormattedTime() {
 
 // Initialize NeoPixel strip
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
+bool timeSynced = false;
 // LED state management
 enum LEDState {
   LED_OFF,
@@ -72,6 +73,26 @@ void handlePrimePump();
 // Function declarations for header and footer generators
 String generateHeader(String title);
 String generateFooter();
+// --- Weekly Schedule Data Structure ---
+struct DaySchedule {
+  bool enabled;
+  int hour;
+  int minute;
+  float volume;
+};
+
+struct WeeklySchedule {
+  String channelName;
+  DaySchedule days[7]; // 0=Monday, 6=Sunday
+  bool missedDoseCompensation;
+};
+
+// Global WeeklySchedule variables
+WeeklySchedule weeklySchedule1;
+WeeklySchedule weeklySchedule2;
+// Function prototypes for helpers used before definition
+int calculateDaysRemaining(float remainingML, WeeklySchedule* ws);
+void sendNtfyNotification(const String& title, const String& message);
 
 // Global Variables for LED
 LEDState currentLEDState = LED_OFF;
@@ -121,6 +142,11 @@ String lastDispensedTime2 = "N/A";
 bool isPrimingChannel1 = false;
 bool isPrimingChannel2 = false;
 
+// Notification settings
+bool notifyLowFert = true;
+bool notifyStart = false;
+bool notifyDose = false;
+
 // Function Prototypes
 void setupWiFi();
 void setupWebServer();
@@ -146,23 +172,6 @@ void handleRestartOnly();
 void handleWiFiReset();
 void handleFactoryReset();
 void handleSystemSettingsSave();
-
-// --- Weekly Schedule Data Structure ---
-struct DaySchedule {
-  bool enabled;
-  int hour;
-  int minute;
-  float volume;
-};
-
-struct WeeklySchedule {
-  String channelName;
-  DaySchedule days[7]; // 0=Monday, 6=Sunday
-  bool missedDoseCompensation;
-};
-
-WeeklySchedule weeklySchedule1;
-WeeklySchedule weeklySchedule2;
 
 // --- Helper: Day names ---
 const char* dayNames[7] = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
@@ -315,14 +324,33 @@ void setup() {
   setupOTA();
 
   // Initialize mDNS
-  if (MDNS.begin("doser")) { // Replace "doser" with your desired hostname
-    Serial.println("mDNS responder started");
+  String sanitizedDeviceName = deviceName;
+  sanitizedDeviceName.replace(" ", "-"); // Replace spaces with hyphens for mDNS compatibility
+  if (MDNS.begin(sanitizedDeviceName.c_str())) { // Use sanitized device name
+    Serial.println("mDNS responder started with hostname: " + sanitizedDeviceName);
   } else {
     Serial.println("Error setting up mDNS responder!");
   }
 
   // Set LED to Green at the end of setup
   updateLED(LED_GREEN);
+//print the values in if condition wifi status trime
+  
+
+   // After WiFi connects, send System Start notification if enabled
+   if (WiFi.status() == WL_CONNECTED && timeSynced && notifyStart) {
+    String msg = "IP: " + WiFi.localIP().toString();
+    msg += "\n";
+    msg += "Device: " + deviceName + "\n";
+    msg += channel1Name + ": " + String(remainingMLChannel1) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1)) + "\n";
+    msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2));
+    Serial.println("Sending System Start notification: " + msg);
+    sendNtfyNotification(deviceName+" Start", msg);
+  }
+  // serial print time synced notifystart and wifistatus
+  Serial.println("[BOOT] Time Synced: " + String(timeSynced));
+  Serial.println("[BOOT] WiFi Status: " + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected"));
+  Serial.println("[BOOT] Notification: " + String(notifyStart ? "Enabled" : "Disabled"));
 }
 
 void loop() {
@@ -388,8 +416,6 @@ void setupWiFi() {
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
-  // Update LED to green after WiFi connection
- // updateLED(LED_GREEN);
 }
 
 void setupWebServer() {
@@ -1186,10 +1212,7 @@ void setupWebServer() {
     String defaultDeviceName = "Doser_" + mac;
     if (deviceName == "") deviceName = defaultDeviceName;
     // Use global ntfyChannel
-    // Load current values (replace with actual persistent values if available)
-    bool notifyLowFert = true;
-    bool notifyStart = false;
-    bool notifyDose = false;
+    // Use global notification variables directly instead of local ones
     // Calibration factors
     float calib1 = calibrationFactor1;
     float calib2 = calibrationFactor2;
@@ -1265,9 +1288,9 @@ void setupWebServer() {
     chunk += "<div class='form-row'>Events to Notify:</div>";
     server.sendContent(chunk);
     
-    chunk = "<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert' checked><label for='notifyLowFert'>Low Fertilizer Volume</label></div>";
-    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart' " + String(notifyStart ? "checked" : "") + "><label for='notifyStart'>System Start</label></div>";
-    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose' " + String(notifyDose ? "checked" : "") + "><label for='notifyDose'>Dose</label></div>";
+    chunk = "<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert'" + String(notifyLowFert ? " checked" : "") + "><label for='notifyLowFert'>Low Fertilizer Volume</label></div>";
+    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart'" + String(notifyStart ? " checked" : "") + "><label for='notifyStart'>System Start</label></div>";
+    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose'" + String(notifyDose ? " checked" : "") + "><label for='notifyDose'>Dose</label></div>";
     server.sendContent(chunk);
     
     // Buttons
@@ -1492,6 +1515,22 @@ void handleManualDispense() {
     }
     savePersistentDataToSPIFFS();
     Serial.println("[MANUAL DOSE] savePersistentDataToSPIFFS called");
+
+    // After dosing, send notifications if enabled
+    // Use global notification variables instead of reading from form arguments
+    String chName = (channel == 1) ? channel1Name : channel2Name;
+    float remML = (channel == 1) ? remainingMLChannel1 : remainingMLChannel2;
+    WeeklySchedule* ws = (channel == 1) ? &weeklySchedule1 : &weeklySchedule2;
+    int daysLeft = calculateDaysRemaining(remML, ws);
+    if (notifyDose) {
+      String msg = "Dose given on " + chName + ". Remaining: " + String(remML) + "ml, Days left: " + String(daysLeft);
+      sendNtfyNotification("Dose Notification", msg);
+    }
+    if (notifyLowFert && daysLeft <= 7) {
+      String msg = "Low fertilizer on " + chName + " Alert";
+      sendNtfyNotification("Low Fertilizer Alert", msg);
+    }
+
     server.send(200, "application/json", "{\"status\":\"dispensed\"}");
   } else {
     server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
@@ -1568,6 +1607,8 @@ void setupTimeSync() {
   if (retries >= 10) {
     Serial.println("Time sync failed!");
   } else {
+    //set global flag
+    timeSynced = true;
     Serial.println("Time synced successfully");
     Serial.println("Current time: " + getFormattedTime());
   }
@@ -1612,6 +1653,11 @@ void loadPersistentDataFromSPIFFS() {
   // Load device name
   deviceName = doc["deviceName"] | "";
 
+  // Load notification settings
+  notifyLowFert = doc["notifyLowFert"] | true;
+  notifyStart = doc["notifyStart"] | false;
+  notifyDose = doc["notifyDose"] | false;
+
   file.close();
   Serial.println("Loaded configuration from filesystem");
 }
@@ -1647,6 +1693,11 @@ void savePersistentDataToSPIFFS() {
 
   // Save device name
   doc["deviceName"] = deviceName;
+
+  // Save notification settings
+  doc["notifyLowFert"] = notifyLowFert;
+  doc["notifyStart"] = notifyStart;
+  doc["notifyDose"] = notifyDose;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println("Failed to write JSON to file");
@@ -1911,13 +1962,56 @@ void handleSystemSettingsSave() {
     }
   }
 
+  // Save notification settings - always mark as updated since these are important
+  bool oldNotifyLowFert = notifyLowFert;
+  bool oldNotifyStart = notifyStart;
+  bool oldNotifyDose = notifyDose;
+  
+  notifyLowFert = server.hasArg("notifyLowFert");
+  notifyStart = server.hasArg("notifyStart");
+  notifyDose = server.hasArg("notifyDose");
+  
+  // Check if notification settings changed
+  if (oldNotifyLowFert != notifyLowFert || oldNotifyStart != notifyStart || oldNotifyDose != notifyDose) {
+    updated = true;
+  }
+
   // Save other settings here as needed (device name, NTFY settings, etc.)
   
-  if (updated) {
-    savePersistentDataToSPIFFS();
+  // Always save to persist notification settings
+  savePersistentDataToSPIFFS();
+  
+  server.send(200, "text/plain", "Settings saved");
+}
+
+// Helper: Send NTFY notification
+void sendNtfyNotification(const String& title, const String& message) {
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  String ntfyUrl = "http://ntfy.sh/" + mac;
+  Serial.println("Sending NTFY notification to: " + ntfyUrl);
+  WiFiClient wifiClient;
+  HTTPClient http;
+  http.begin(wifiClient, ntfyUrl);
+  http.addHeader("Title", title);
+  http.POST(message);
+  http.end();
+}
+
+// Helper: Calculate days remaining for a channel
+int calculateDaysRemaining(float remainingML, WeeklySchedule* ws) {
+  int days = 0;
+  int dayIdx = (timeClient.getDay() + 6) % 7;
+  float rem = remainingML;
+  for (int i = 0; i < 365; ++i) {
+    int d = (dayIdx + i) % 7;
+    if (ws->days[d].enabled) {
+      float dose = ws->days[d].volume;
+      if (rem < dose || dose <= 0.0f) break;
+      rem -= dose;
+      days++;
+    }
   }
-  // Redirect to summary page after saving
-  server.sendHeader("Location", "/newUI/summary");
-  server.send(302, "text/plain", "");
+  return days;
 }
 
