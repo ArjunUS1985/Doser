@@ -410,6 +410,29 @@ void loop() {
 void setupWiFi() {
   WiFiManager wifiManager;
 
+  // Configure WiFiManager for better captive portal experience
+  wifiManager.setAPCallback([](WiFiManager *myWiFiManager) {
+    Serial.println(F("Entered config mode"));
+    Serial.println(WiFi.softAPIP());
+    Serial.println(myWiFiManager->getConfigPortalSSID());
+  });
+
+  // Set timeout for config portal (0 = no timeout)
+  wifiManager.setConfigPortalTimeout(300); // 5 minutes timeout
+  
+  // Set minimum signal quality
+  wifiManager.setMinimumSignalQuality(10);
+  
+  // Configure custom parameters for better captive portal
+  wifiManager.setAPStaticIPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+  
+  // Set debug output
+  wifiManager.setDebugOutput(true);
+  
+  // Configure captive portal
+  wifiManager.setCaptivePortalEnable(true);
+  wifiManager.setBreakAfterConfig(true);
+
   // Automatically start configuration portal if no WiFi is configured
   if (!wifiManager.autoConnect("Doser_AP")) {
     Serial.println(F("Failed to connect to WiFi and hit timeout"));
@@ -419,7 +442,6 @@ void setupWiFi() {
   Serial.println(F("Connected to WiFi."));
   Serial.print(F("IP Address: "));
   Serial.println(WiFi.localIP());
-
 }
 
 void setupWebServer() {
@@ -443,7 +465,7 @@ void setupWebServer() {
     chunk += F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
     chunk += F(".card h2{margin-top:0;color:#007BFF;} ");
     chunk += F(".calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} ");
-    chunk += F(".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ");
+    chunk += F(".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#dc3545;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ");
     chunk += F(".calib-btn:disabled{background:#aaa;cursor:not-allowed;} ");
     chunk += F(".home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} ");
     chunk += F(".back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} ");
@@ -626,6 +648,8 @@ void setupWebServer() {
     // Send CSS in chunks
     chunk += F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
     chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ");
+    chunk += F(".status-chip { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-left: 8px; } ");
+    chunk += F(".chip-running-low { background: #dc3545; color: #fff; } ");
     
     chunk += F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
     chunk += F("border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ");
@@ -667,8 +691,12 @@ void setupWebServer() {
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume1) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel1) + F(" ml</p>");
     chunk += F("<p>Days Remaining: ");
-    if (moreThanYear1) chunk += F("More than a year");
-    else chunk += String(simulatedDays1);
+    if (moreThanYear1) {
+      chunk += F("More than a year");
+    } else {
+      String daysColor = (simulatedDays1 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+      chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays1) + F("</span>");
+    }
     chunk += F("</p>");
     
     chunk += F("<div id='manualDoseSection1'>");
@@ -704,8 +732,12 @@ void setupWebServer() {
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
     chunk += F("<p>Days Remaining: ");
-    if (moreThanYear2) chunk += F("More than a year");
-    else chunk += String(simulatedDays2);
+    if (moreThanYear2) {
+      chunk += F("More than a year");
+    } else {
+      String daysColor = (simulatedDays2 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+      chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays2) + F("</span>");
+    }
     chunk += F("</p>");
     
     chunk += F("<div id='manualDoseSection2'>");
@@ -848,7 +880,7 @@ void setupWebServer() {
     chunk += F("  document.getElementById('rename-btn-row').style.display = 'block';\n");
     chunk += F("}\n");
     
-    chunk += F("function saveRename(channel) {\n");
+chunk += F("function saveRename(channel) {\n");
     chunk += F("  var newName = document.getElementById('rename-input').value;\n");
     chunk += F("  if (!newName) { alert('Name cannot be empty'); return; }\n");
     chunk += F("  var xhr = new XMLHttpRequest();\n");
@@ -915,8 +947,12 @@ void setupWebServer() {
     chunk += F("<p>Last Dosed: ") + lastDispensedTime + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: <span id='remaining-volume-label'>") + String(remainingML) + F(" ml (");
-    if (moreThanYear) chunk += F("More than a year");
-    else chunk += String(simulatedDays) + F(" days");
+    if (moreThanYear) {
+      chunk += F("More than a year");
+    } else {
+      String daysColor = (simulatedDays <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+      chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays) + F(" days</span>");
+    }
     chunk += F(")</span> ");
     
     chunk += F("<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>");
@@ -971,8 +1007,8 @@ void setupWebServer() {
     
     // Actions Card
     chunk += F("<div class='card'>");
-    chunk += F("<button onclick=\"location.href='/prime?channel=") + String(channel) + F("'\">Prime Pump</button>");
-    chunk += F("<button onclick=\"location.href='/calibrate?channel=") + String(channel) + F("'\">Calibrate</button>");
+    chunk += F("<button style='background:#dc3545;color:#fff;' onclick=\"location.href='/prime?channel=") + String(channel) + F("'\">Prime Pump</button>");
+    chunk += F("<button style='background:#dc3545;color:#fff;' onclick=\"location.href='/calibrate?channel=") + String(channel) + F("'\">Calibrate</button>");
     
     // Rename UI
     chunk += F("<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>");
@@ -1845,7 +1881,7 @@ void handlePrimePump() {
 
 // Common header and footer generators
 String generateHeader(const String& title) {
-  String html = F("<div style='max-width:500px;margin:0 auto 10px auto;background:#007BFF;color:#fff;padding:16px 0;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);'>");
+  String html = F("<div style='max-width:550px;width:100%;margin:0 auto 10px auto;background:#007BFF;color:#fff;padding:16px 20px;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);box-sizing:border-box;'>");
   html += title;
   html += F("</div>");
   return html;
