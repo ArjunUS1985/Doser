@@ -491,7 +491,7 @@ void setupWebServer() {
     chunk += F("<input type='hidden' name='channel' value='") + String(channel) + F("'>");
     chunk += F("<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>");
     chunk += F("</form>");
-    chunk += F("<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+    chunk += F("<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/summary'\">Home</button>");
     chunk += F("<button class='back-btn' id='backBtn' onclick=\"history.back()\">Back</button>");
     chunk += F("</div>");
     chunk += generateFooter();
@@ -593,7 +593,7 @@ void setupWebServer() {
     chunk += F("<div class='card'>");
     chunk += F("<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>");
     chunk += F("<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>");
-    chunk += F("<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+    chunk += F("<button class='home-btn' onclick=\"window.location.href='/summary'\">Home</button>");
     chunk += F("<button class='back-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;' onclick=\"history.back()\">Back</button>");
     chunk += F("</div>");
     chunk += generateFooter();
@@ -604,7 +604,7 @@ void setupWebServer() {
     server.sendContent("");
   });
 
-  server.on("/newUI/summary", HTTP_GET, []() {
+  server.on("/summary", HTTP_GET, []() {
     Serial.print(F("[SUMMARY] lastDispensedVolume1: ")); Serial.println(lastDispensedVolume1);
     Serial.print(F("[SUMMARY] lastDispensedTime1: ")); Serial.println(lastDispensedTime1);
     Serial.print(F("[SUMMARY] lastDispensedVolume2: ")); Serial.println(lastDispensedVolume2);
@@ -667,7 +667,7 @@ void setupWebServer() {
     chunk += F("<div id='manualDoseSection1'>");
     chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>");
     chunk += F("</div>");
-    chunk += F("<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>");
+    chunk += F("<button onclick=\"location.href='/manageChannel?channel=1'\">Manage Channel 1</button>");
     chunk += F("</div>");
     
     // Channel 2 Summary
@@ -704,12 +704,12 @@ void setupWebServer() {
     chunk += F("<div id='manualDoseSection2'>");
     chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>");
     chunk += F("</div>");
-    chunk += F("<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>");
+    chunk += F("<button onclick=\"location.href='/manageChannel?channel=2'\">Manage Channel 2</button>");
     chunk += F("</div>");
     
     // System Time and Actions
     chunk += F("<div class='card'>");
-    chunk += F("<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>");
+    chunk += F("<button onclick=\"location.href='/systemSettings'\">System Settings</button>");
     chunk += F("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>") + getFormattedTime() + F("</span></div>");
     chunk += F("</div>");
     
@@ -786,7 +786,7 @@ void setupWebServer() {
     server.sendContent("");
   });
 
-  server.on("/newUI/manageChannel", HTTP_GET, []() {
+  server.on("/manageChannel", HTTP_GET, []() {
     int channel = 1;
     if (server.hasArg("channel")) {
       channel = server.arg("channel").toInt();
@@ -845,7 +845,7 @@ void setupWebServer() {
     chunk += F("  var newName = document.getElementById('rename-input').value;\n");
     chunk += F("  if (!newName) { alert('Name cannot be empty'); return; }\n");
     chunk += F("  var xhr = new XMLHttpRequest();\n");
-    chunk += F("  xhr.open('POST', '/newUI/renameChannel', true);\n");
+    chunk += F("  xhr.open('POST', '/renameChannel', true);\n");
     chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
     chunk += F("  xhr.onreadystatechange = function() {\n");
     chunk += F("    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n");
@@ -867,7 +867,7 @@ void setupWebServer() {
     chunk += F("  var newVol = document.getElementById('update-volume-input').value;\n");
     chunk += F("  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n");
     chunk += F("  var xhr = new XMLHttpRequest();\n");
-    chunk += F("  xhr.open('POST', '/newUI/updateVolume', true);\n");
+    chunk += F("  xhr.open('POST', '/updateVolume', true);\n");
     chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
     chunk += F("  xhr.onreadystatechange = function() {\n");
     chunk += F("    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n");
@@ -959,7 +959,7 @@ void setupWebServer() {
       chunk += F("<p>Next Dose: N/A</p>");
       chunk += F("<p>Next Dose Volume: N/A</p>");
     }
-    chunk += F("<button onclick=\"location.href='/newUI/manageSchedule?channel=") + String(channel) + F("'\">Manage Schedule</button>");
+    chunk += F("<button onclick=\"location.href='/manageSchedule?channel=") + String(channel) + F("'\">Manage Schedule</button>");
     chunk += F("</div>");
     
     // Actions Card
@@ -978,7 +978,7 @@ void setupWebServer() {
     
     // Back and Home buttons row
     chunk += F("<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>");
-    chunk += F("<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+    chunk += F("<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/summary'\">Home</button>");
     chunk += F("</div>");
     
     // Footer
@@ -991,7 +991,7 @@ void setupWebServer() {
   });
 
   // Add endpoint to handle rename POST
-  server.on("/newUI/renameChannel", HTTP_POST, []() {
+  server.on("/renameChannel", HTTP_POST, []() {
     if (server.hasArg("channel") && server.hasArg("name")) {
       int channel = server.arg("channel").toInt();
       String newName = server.arg("name");
@@ -1008,7 +1008,7 @@ void setupWebServer() {
   });
 
   // Add endpoint to handle update volume POST
-  server.on("/newUI/updateVolume", HTTP_POST, []() {
+  server.on("/updateVolume", HTTP_POST, []() {
     if (server.hasArg("channel") && server.hasArg("volume")) {
       int channel = server.arg("channel").toInt();
       float newVol = server.arg("volume").toFloat();
@@ -1025,7 +1025,7 @@ void setupWebServer() {
   });
 
   // --- Manage Schedule UI ---
-  server.on("/newUI/manageSchedule", HTTP_GET, []() {
+  server.on("/manageSchedule", HTTP_GET, []() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
     WeeklySchedule* ws = (channel == 2) ? &weeklySchedule2 : &weeklySchedule1;
@@ -1035,8 +1035,22 @@ void setupWebServer() {
     // HTML head and style
     String chunk = F("<html><head><title>Manage Schedule: ") + ws->channelName + F("</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
-    chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
-    
+    chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}\n");
+    chunk += F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}\n");
+    chunk += F(".card h2{margin-top:0;color:#007BFF;}\n");
+    chunk += F(".form-row{margin-bottom:16px;}\n");
+    chunk += F("label{display:block;margin-bottom:6px;font-weight:500;}\n");
+    chunk += F(".schedule-table-wrapper{width:100%;overflow-x:auto;margin:0 auto;box-sizing:border-box;}\n");
+    chunk += F("table.schedule-table{width:100%;max-width:100%;margin:0 auto;box-sizing:border-box;border-collapse:collapse;}\n");
+    chunk += F("th,td{padding:8px;text-align:center;box-sizing:border-box;}\n");
+    chunk += F("th{background:#007BFF;color:#fff;}\n");
+    chunk += F("tr:nth-child(even){background:#f9f9f9;}\n");
+    chunk += F("input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;}\n");
+    chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; }\n");
+    chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; }\n");
+    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }\n");
+    chunk += F("@media (max-width:600px){.card{padding:10px;}th,td{font-size:0.95em;padding:6px;}input[type=number],input[type=time]{width:90%;min-width:60px;}}\n");
+    chunk += F("</style>");
     // JS chunk
     chunk += F("<script>\n");
     chunk += F("function copyMondayToOthers() {\n");
@@ -1071,8 +1085,9 @@ void setupWebServer() {
     // Header and card open
     chunk += generateHeader("Manage Schedule : " + ws->channelName);
     chunk += F("<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>");
-    chunk += F("<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=") + String(channel) + F("'>");
-    chunk += F("<table style='width:100%;border-collapse:collapse;'>");
+    chunk += F("<form id='scheduleForm' method='POST' action='/manageSchedule?channel=") + String(channel) + F("'>");
+    chunk += F("<div class='schedule-table-wrapper'>");
+    chunk += F("<table class='schedule-table'>");
     chunk += F("<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>");
     
     // Table rows chunked
@@ -1089,12 +1104,12 @@ void setupWebServer() {
     }
     
     // After table
-    chunk += F("</table>");
-    chunk += F("<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>");
-    chunk += String(F("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'")) + (ws->missedDoseCompensation ? F(" checked") : F("")) + F("><label for='missedDose'>Missed Dose Compensation</label></div>");
+    chunk += F("</table></div>");
+    chunk += F("<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)' style='margin-right:8px;vertical-align:middle;'><label for='copyMonday' style='display:inline;margin:0;white-space:nowrap;vertical-align:middle;'>All day as Monday</label></div>");
+    chunk += String(F("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'")) + (ws->missedDoseCompensation ? F(" checked") : F("")) + F(" style='margin-right:8px;vertical-align:middle;'><label for='missedDose' style='display:inline;margin:0;white-space:nowrap;vertical-align:middle;'>Missed Dose Compensation</label></div>");
     chunk += F("<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>");
     chunk += F("<button type='submit' style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;'>Save</button>");
-    chunk += F("<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;'>Cancel</button>");
+    chunk += F("<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/manageChannel?channel=") + String(channel) + F("'\">Cancel</button>");
     chunk += F("</div>");
     chunk += F("</form>");
     chunk += F("</div>");
@@ -1110,11 +1125,6 @@ void setupWebServer() {
     chunk += F("    for(var i=1;i<7;i'){document.getElementById('enabled'+i).disabled=false;document.getElementById('time'+i).disabled=false;document.getElementById('vol'+i).disabled=false;document.getElementById('enabled'+i).checked=enabled;document.getElementById('time'+i).value=time;document.getElementById('vol'+i).value=vol;}\n");
     chunk += F("  }\n");
     chunk += F("});\n");
-    chunk += F("document.getElementById('cancelBtn').addEventListener('click',function(){\n");
-    chunk += F("  var url = new URL(window.location.href);\n");
-    chunk += F("  var channel = url.searchParams.get('channel') || '1';\n");
-    chunk += F("  window.location.href = '/newUI/manageChannel?channel=' + channel;\n");
-    chunk += F("});\n");
     chunk += F("</script>\n");
     chunk += F("</form></body></html>");
     server.sendContent(chunk);
@@ -1122,7 +1132,7 @@ void setupWebServer() {
     server.sendContent("");
   });
 
-  server.on("/newUI/manageSchedule", HTTP_POST, []() {
+  server.on("/manageSchedule", HTTP_POST, []() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
     WeeklySchedule* ws = (channel == 2) ? &weeklySchedule2 : &weeklySchedule1;
@@ -1140,11 +1150,11 @@ void setupWebServer() {
     }
     ws->missedDoseCompensation = server.hasArg("missedDose");
     saveWeeklySchedulesToSPIFFS();
-    server.sendHeader("Location", "/newUI/manageChannel?channel=" + String(channel));
+    server.sendHeader("Location", "/manageChannel?channel=" + String(channel));
     server.send(302, "text/plain", "");
   });
 
-  server.on("/newUI/systemSettings", HTTP_GET, []() {
+  server.on("/systemSettings", HTTP_GET, []() {
     // Get MAC address for default device name
     String mac = WiFi.macAddress();
     mac.replace(":", "");
@@ -1165,13 +1175,15 @@ void setupWebServer() {
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ");
     
-    // CSS in chunks
+    // CSS in smaller chunks
     chunk += F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
     chunk += F(".card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} ");
     chunk += F("label{display:block;margin-bottom:6px;font-weight:500;} ");
     chunk += F("input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} ");
     chunk += F(".section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} ");
-    chunk += F(".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} ");
+    chunk += F(".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:nowrap;}\n");
+    chunk += F(".checkbox-row input[type=checkbox]{margin:0 6px 0 0;flex-shrink:0;}\n");
+    chunk += F(".checkbox-row label{margin:0;white-space:nowrap;display:inline-block;vertical-align:middle;}\n");
     chunk += F(".btn-row{display:flex;gap:10px;margin-top:18px;} ");
     chunk += F(".btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} ");
     chunk += F(".btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} ");
@@ -1182,7 +1194,7 @@ void setupWebServer() {
     chunk += generateHeader("System Settings");
     
     // Form start and device settings
-    chunk += F("<form method='POST' action='/newUI/systemSettings'>");
+    chunk += F("<form method='POST' action='/systemSettings'>");
     chunk += F("<div class='card'>");
     chunk += F("<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='") + deviceName + F("'></div>");
 
@@ -1218,7 +1230,7 @@ void setupWebServer() {
     // Buttons
     chunk += F("<div class='btn-row'>");
     chunk += F("<button type='submit' class='btn btn-main'>Save</button>");
-    chunk += F("<button type='button' class='btn btn-cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button>");
+    chunk += F("<button type='button' class='btn btn-cancel' onclick=\"window.location.href='/summary'\">Cancel</button>");
     chunk += F("</div></div></form>"); // Close main form and card
 
     // Action buttons outside the main form
@@ -1271,21 +1283,6 @@ void setupWebServer() {
     chunk += F("function hideFirmwareUpdate() {");
     chunk += F("  document.getElementById('firmwareUpdateSection').style.display = 'none';");
     chunk += F("  document.getElementById('updateProgress').style.display = 'none';");
-    chunk += F("}");
-    
-    chunk += F("async function updateFirmware() {");
-    chunk += F("  const url = document.getElementById('firmwareUrl').value;");
-    chunk += F("  if (!url) { alert('Please enter firmware URL'); return; }");
-    chunk += F("  document.getElementById('updateProgress').style.display = 'block';");
-    chunk += F("  const progressFill = document.getElementById('progressFill');");
-    chunk += F("  const progressText = document.getElementById('progressText');");
-    
-    chunk += F("  try {");
-    chunk += F("    const response = await fetch(url);");
-    chunk += F("    if (!response.ok) throw new Error('Failed to download firmware');");
-    chunk += F("    const contentLength = response.headers.get('content-length');");
-    chunk += F("    const total = parseInt(contentLength, 10);");
-    chunk += F("    let loaded = 0; const reader = response.body.getReader(); const chunks = [];");
     
     chunk += F("    while (true) {");
     chunk += F("      const { done, value } = await reader.read();");
@@ -1311,7 +1308,7 @@ void setupWebServer() {
     chunk += F("    });");
     chunk += F("    if (uploadResponse.ok) {");
     chunk += F("      progressText.textContent = 'Firmware updated successfully! Device will restart...';");
-    chunk += F("      setTimeout(() => { window.location.href = '/newUI/summary'; }, 3000);");
+    chunk += F("      setTimeout(() => { window.location.href = '/summary'; }, 3000);");
     chunk += F("    } else { throw new Error('Failed to flash firmware'); }");
     
     chunk += F("  } catch (error) {");
@@ -1333,7 +1330,13 @@ void setupWebServer() {
   server.on("/restart", HTTP_POST, handleRestartOnly);
   server.on("/wifiReset", HTTP_POST, handleWiFiReset);
   server.on("/factoryReset", HTTP_POST, handleFactoryReset);
-  server.on("/newUI/systemSettings", HTTP_POST, handleSystemSettingsSave);
+  server.on("/systemSettings", HTTP_POST, handleSystemSettingsSave);
+
+  // Root access should redirect to summary
+  server.on("/", HTTP_GET, []() {
+    server.sendHeader("Location", "/summary");
+    server.send(302, "text/plain", "");
+  });
 
   server.begin();
 }
@@ -1349,12 +1352,12 @@ void handleCalibration() {
       calibrationFactor = 15000.0 / dispensedML;
       savePersistentDataToSPIFFS();
       // Show toast and redirect to channel management
-      String html = F("<html><head><meta http-equiv='refresh' content='2;url=/newUI/manageChannel?channel=") + String(channel) + F("'>");
+      String html = F("<html><head><meta http-equiv='refresh' content='2;url=/manageChannel?channel=") + String(channel) + F("'>");
       html += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
       html += F("<style>.toast{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#28a745;color:#fff;padding:18px 32px;border-radius:8px;font-size:1.2em;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:9999;}</style>");
       html += F("</head><body>");
       html += F("<div class='toast'>Calibration complete!</div>");
-      html += F("<script>setTimeout(function(){window.location.href='/newUI/manageChannel?channel=") + String(channel) + F("';},1800);</script>");
+      html += F("<script>setTimeout(function(){window.location.href='/manageChannel?channel=") + String(channel) + F("';},1800);</script>");
       html += F("</body></html>");
       server.send(200, "text/html", html);
       return;
@@ -1381,7 +1384,7 @@ void handleCalibration() {
       html += F("<input type='number' name='dispensedML' step='0.1' required class='calib-input'><br>");
       html += F("<button type='submit' class='calib-submit'>Submit Measurement</button>");
       html += F("</form>");
-      html += F("<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+      html += F("<button class='home-btn' onclick=\"window.location.href='/summary'\">Home</button>");
       html += F("<button class='back-btn' onclick=\"history.back()\">Back</button>");
       html += F("</div>");
       html += generateFooter();
@@ -1891,7 +1894,7 @@ void handleSystemSettingsSave() {
   
   // Always save to persist notification settings
   savePersistentDataToSPIFFS();
-  server.sendHeader("Location", "/newUI/summary");
+  server.sendHeader("Location", "/summary");
   server.send(302, "text/plain", "");
 }
 
