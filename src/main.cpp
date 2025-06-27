@@ -434,48 +434,39 @@ void setupWebServer() {
     String chunk = F("<html><head><title>Calibrate</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ");
-    server.sendContent(chunk);
     
     // Send CSS in smaller chunks
-    chunk = F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
+    chunk += F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
     chunk += F(".card h2{margin-top:0;color:#007BFF;} ");
     chunk += F(".calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} ");
-    server.sendContent(chunk);
-    
-    chunk = F(".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ");
+    chunk += F(".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ");
     chunk += F(".calib-btn:disabled{background:#aaa;cursor:not-allowed;} ");
     chunk += F(".home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} ");
-    server.sendContent(chunk);
-    
-    chunk = F(".back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} ");
+    chunk += F(".back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} ");
     chunk += F("#countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} ");
     chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
+    chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
     chunk += F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
     chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }");
     chunk += F("</style>");
-    server.sendContent(chunk);
     
     // Send JavaScript
-    chunk = F("<script>\n");
+    chunk += F("<script>\n");
     chunk += F("function startCountdown() {\n");
     chunk += F("  var btn = document.getElementById('calibBtn');\n");
     chunk += F("  var homeBtn = document.getElementById('homeBtn');\n");
     chunk += F("  var backBtn = document.getElementById('backBtn');\n");
     chunk += F("  var countdown = document.getElementById('countdown');\n");
-    server.sendContent(chunk);
     
-    chunk = F("  btn.disabled = true;\n");
+    chunk += F("  btn.disabled = true;\n");
     chunk += F("  homeBtn.disabled = true;\n");
     chunk += F("  backBtn.disabled = true;\n");
     chunk += F("  var timeLeft = 15;\n");
     chunk += F("  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n");
     chunk += F("  var interval = setInterval(function() {\n");
-    server.sendContent(chunk);
     
-    chunk = F("    timeLeft--;\n");
+    chunk += F("    timeLeft--;\n");
     chunk += F("    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n");
     chunk += F("    if (timeLeft <= 0) {\n");
     chunk += F("      clearInterval(interval);\n");
@@ -483,9 +474,8 @@ void setupWebServer() {
     chunk += F("      btn.disabled = false;\n");
     chunk += F("      homeBtn.disabled = false;\n");
     chunk += F("      backBtn.disabled = false;\n");
-    server.sendContent(chunk);
     
-    chunk = F("    }\n");
+    chunk += F("    }\n");
     chunk += F("  }, 1000);\n");
     chunk += F("}\n");
     chunk += F("function onSubmitCalib(e){\n");
@@ -496,9 +486,7 @@ void setupWebServer() {
     chunk += generateHeader("Calibrate: " + channelName);
     chunk += F("<div class='card'>");
     chunk += F("<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>");
-    server.sendContent(chunk);
-    
-    chunk = F("<div id='countdown'></div>");
+    chunk += F("<div id='countdown'></div>");
     chunk += F("<form action='/calibrate?channel=") + String(channel) + F("' method='POST' onsubmit='onSubmitCalib(event)'>");
     chunk += F("<input type='hidden' name='channel' value='") + String(channel) + F("'>");
     chunk += F("<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>");
@@ -562,31 +550,24 @@ void setupWebServer() {
     chunk += F("<title>Prime Pump</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } ");
-    server.sendContent(chunk);
     
     // CSS in chunks
-    chunk = F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } ");
+    chunk += F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } ");
     chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } ");
-    server.sendContent(chunk);
-    
-    chunk = F(".prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } ");
+    chunk += F(".prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } ");
     chunk += F(".prime-btn.stop { background: #28a745; } ");
     chunk += F(".prime-btn:active { opacity: 0.9; } ");
     chunk += F(".home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } ");
+    chunk += F(".back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } ");
     chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
     chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
-    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }");
-    chunk += F("</style>");
-    server.sendContent(chunk);
+    chunk += F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
+    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
     
     // JavaScript
-    chunk = F("<script>\n");
+    chunk += F("<script>\n");
     chunk += F("function togglePrime() {\n");
     chunk += F("  var btn = document.getElementById('primeButton');\n");
     chunk += F("  var state = btn.getAttribute('data-state') === '1' ? '0' : '1';\n");
@@ -598,19 +579,17 @@ void setupWebServer() {
     chunk += F("  btn.value = state === '1' ? 'Done' : 'Start';\n");
     chunk += F("  btn.className = state === '1' ? 'prime-btn stop' : 'prime-btn';\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("window.onload = function() {\n");
+    chunk += F("window.onload = function() {\n");
     chunk += F("  var btn = document.getElementById('primeButton');\n");
     chunk += F("  btn.value = 'Start';\n");
     chunk += F("  btn.className = 'prime-btn';\n");
     chunk += F("}\n");
     chunk += F("</script>");
     chunk += F("</head><body>");
-    server.sendContent(chunk);
     
     // Body content
-    chunk = generateHeader("Prime Pump: " + channelName);
+    chunk += generateHeader("Prime Pump: " + channelName);
     chunk += F("<div class='card'>");
     chunk += F("<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>");
     chunk += F("<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>");
@@ -639,25 +618,20 @@ void setupWebServer() {
     String chunk = F("<html><head><title>Dosing Summary</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ");
-    server.sendContent(chunk);
     
     // Send CSS in chunks
-    chunk = F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
+    chunk += F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
     chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
+    chunk += F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
     chunk += F("border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
+    chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
     chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
     chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>");
-    server.sendContent(chunk);
     
     // Generate header
-    chunk = generateHeader("Dosing Summary");
-    server.sendContent(chunk);
+    chunk += generateHeader("Dosing Summary");
     
     // Channel 1 Summary
     int daysRemaining1 = 0;
@@ -680,7 +654,7 @@ void setupWebServer() {
       moreThanYear1 = true;
     }
     
-    chunk = F("<div class='card'>");
+    chunk += F("<div class='card'>");
     chunk += F("<h2>") + channel1Name + F("</h2>");
     chunk += F("<p>Last Dosed Time: ") + lastDispensedTime1 + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume1) + F(" ml</p>");
@@ -689,14 +663,12 @@ void setupWebServer() {
     if (moreThanYear1) chunk += F("More than a year");
     else chunk += String(simulatedDays1);
     chunk += F("</p>");
-    server.sendContent(chunk);
     
-    chunk = F("<div id='manualDoseSection1'>");
+    chunk += F("<div id='manualDoseSection1'>");
     chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>");
     chunk += F("</div>");
     chunk += F("<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // Channel 2 Summary
     int daysRemaining2 = 0;
@@ -719,7 +691,7 @@ void setupWebServer() {
       moreThanYear2 = true;
     }
     
-    chunk = F("<div class='card'>");
+    chunk += F("<div class='card'>");
     chunk += F("<h2>") + channel2Name + F("</h2>");
     chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
@@ -728,41 +700,35 @@ void setupWebServer() {
     if (moreThanYear2) chunk += F("More than a year");
     else chunk += String(simulatedDays2);
     chunk += F("</p>");
-    server.sendContent(chunk);
     
-    chunk = F("<div id='manualDoseSection2'>");
+    chunk += F("<div id='manualDoseSection2'>");
     chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>");
     chunk += F("</div>");
     chunk += F("<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // System Time and Actions
-    chunk = F("<div class='card'>");
+    chunk += F("<div class='card'>");
     chunk += F("<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>");
     chunk += F("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>") + getFormattedTime() + F("</span></div>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // Generate footer
-    chunk = generateFooter();
-    server.sendContent(chunk);
+    chunk += generateFooter();
     
     // JavaScript
-    chunk = F("<script>\n");
+    chunk += F("<script>\n");
     chunk += F("function showManualDose1() {\n");
     chunk += F("  var s = document.getElementById('manualDoseSection1');\n");
     chunk += F("  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function showManualDose2() {\n");
+    chunk += F("function showManualDose2() {\n");
     chunk += F("  var s = document.getElementById('manualDoseSection2');\n");
     chunk += F("  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol2' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow2()'>Dose</button><button id='cancelBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose2()'>Cancel</button></div><div id='doseCountdown2' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function cancelManualDose1() {\n");
+    chunk += F("function cancelManualDose1() {\n");
     chunk += F("  var s = document.getElementById('manualDoseSection1');\n");
     chunk += F("  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>`;\n");
     chunk += F("}\n");
@@ -770,9 +736,8 @@ void setupWebServer() {
     chunk += F("  var s = document.getElementById('manualDoseSection2');\n");
     chunk += F("  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>`;\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function doseNow1() {\n");
+    chunk += F("function doseNow1() {\n");
     chunk += F("  var vol = parseFloat(document.getElementById('doseVol1').value);\n");
     chunk += F("  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n");
     chunk += F("  var btn = document.getElementById('doseBtn1');\n");
@@ -781,9 +746,8 @@ void setupWebServer() {
     chunk += F("  var countdown = document.getElementById('doseCountdown1');\n");
     chunk += F("  var duration = Math.ceil(vol * ") + String(calibrationFactor1) + F(" / 1000);\n");
     chunk += F("  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
-    server.sendContent(chunk);
     
-    chunk = F("  var interval = setInterval(function() {\n");
+    chunk += F("  var interval = setInterval(function() {\n");
     chunk += F("    duration--;\n");
     chunk += F("    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
     chunk += F("    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n");
@@ -793,9 +757,8 @@ void setupWebServer() {
     chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
     chunk += F("  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function doseNow2() {\n");
+    chunk += F("function doseNow2() {\n");
     chunk += F("  var vol = parseFloat(document.getElementById('doseVol2').value);\n");
     chunk += F("  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n");
     chunk += F("  var btn = document.getElementById('doseBtn2');\n");
@@ -804,9 +767,8 @@ void setupWebServer() {
     chunk += F("  var countdown = document.getElementById('doseCountdown2');\n");
     chunk += F("  var duration = Math.ceil(vol * ") + String(calibrationFactor2) + F(" / 1000);\n");
     chunk += F("  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
-    server.sendContent(chunk);
     
-    chunk = F("  var interval = setInterval(function() {\n");
+    chunk += F("  var interval = setInterval(function() {\n");
     chunk += F("    duration--;\n");
     chunk += F("    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
     chunk += F("    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n");
@@ -843,53 +805,43 @@ void setupWebServer() {
     String chunk = F("<html><head><title>Channel Management: ") + channelName + F("</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ");
-    server.sendContent(chunk);
     
     // CSS in chunks
-    chunk = F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
+    chunk += F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
     chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
+    chunk += F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
     chunk += F("border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } ");
+    chunk += F(".header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } ");
     chunk += F(".rename-input { flex:1; padding:8px 12px; font-size:1em; border-radius:4px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } ");
+    chunk += F(".rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } ");
     chunk += F(".rename-btn.cancel { background:#aaa; } .rename-row { display:flex; gap:8px; align-items:center; justify-content:center; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } ");
+    chunk += F(".rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } ");
     chunk += F(".rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } ");
+    chunk += F(".rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } ");
     chunk += F("button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } ");
-    server.sendContent(chunk);
     
-    chunk = F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
+    chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
     chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
     chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
-    server.sendContent(chunk);
     
     // JavaScript
-    chunk = F("<script>\n");
+    chunk += F("<script>\n");
     chunk += F("function showRenameBox() {\n");
     chunk += F("  document.getElementById('rename-row').style.display = 'flex';\n");
     chunk += F("  document.getElementById('rename-btn-row').style.display = 'none';\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function cancelRename() {\n");
+    chunk += F("function cancelRename() {\n");
     chunk += F("  document.getElementById('rename-row').style.display = 'none';\n");
     chunk += F("  document.getElementById('rename-btn-row').style.display = 'block';\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function saveRename(channel) {\n");
+    chunk += F("function saveRename(channel) {\n");
     chunk += F("  var newName = document.getElementById('rename-input').value;\n");
     chunk += F("  if (!newName) { alert('Name cannot be empty'); return; }\n");
     chunk += F("  var xhr = new XMLHttpRequest();\n");
@@ -900,21 +852,18 @@ void setupWebServer() {
     chunk += F("  };\n");
     chunk += F("  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function showUpdateVolumeBox() {\n");
+    chunk += F("function showUpdateVolumeBox() {\n");
     chunk += F("  document.getElementById('update-volume-row').style.display = 'flex';\n");
     chunk += F("  document.getElementById('update-volume-btn-row').style.display = 'none';\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function cancelUpdateVolume() {\n");
+    chunk += F("function cancelUpdateVolume() {\n");
     chunk += F("  document.getElementById('update-volume-row').style.display = 'none';\n");
     chunk += F("  document.getElementById('update-volume-btn-row').style.display = 'inline';\n");
     chunk += F("}\n");
-    server.sendContent(chunk);
     
-    chunk = F("function saveUpdateVolume(channel) {\n");
+    chunk += F("function saveUpdateVolume(channel) {\n");
     chunk += F("  var newVol = document.getElementById('update-volume-input').value;\n");
     chunk += F("  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n");
     chunk += F("  var xhr = new XMLHttpRequest();\n");
@@ -927,11 +876,9 @@ void setupWebServer() {
     chunk += F("}\n");
     chunk += F("</script>\n");
     chunk += F("</head><body>");
-    server.sendContent(chunk);
     
     // Header
-    chunk = generateHeader("Channel Management: " + channelName);
-    server.sendContent(chunk);
+    chunk += generateHeader("Channel Management: " + channelName);
     
     // Calculate days remaining for this channel
     int daysRemaining = 0;
@@ -956,7 +903,7 @@ void setupWebServer() {
     }
     
     // Status Card
-    chunk = F("<div class='card'>");
+    chunk += F("<div class='card'>");
     chunk += F("<h2>Status</h2>");
     chunk += F("<p>Last Dosed: ") + lastDispensedTime + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume) + F(" ml</p>");
@@ -964,21 +911,18 @@ void setupWebServer() {
     if (moreThanYear) chunk += F("More than a year");
     else chunk += String(simulatedDays) + F(" days");
     chunk += F(")</span> ");
-    server.sendContent(chunk);
     
-    chunk = F("<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>");
+    chunk += F("<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>");
     chunk += F("<span id='update-volume-row' class='rename-row' style='display:none;'>");
     chunk += F("<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='") + String(remainingML) + F("'>");
     chunk += F("<button class='rename-btn' onclick='saveUpdateVolume(") + String(channel) + F(")'>Save</button>");
     chunk += F("<button class='rename-btn cancel' onclick='cancelUpdateVolume()'>Cancel</button>");
     chunk += F("</span></p>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // Schedule Card
-    chunk = F("<div class='card'>");
+    chunk += F("<div class='card'>");
     chunk += F("<h2>Schedule</h2>");
-    server.sendContent(chunk);
     
     // Show next dose from weekly schedule
     int today = (timeClient.getDay() + 6) % 7; // 0=Monday, 6=Sunday
@@ -1009,40 +953,36 @@ void setupWebServer() {
     if (nextDay >= 0) {
       String ampm = (nextHour < 12) ? F("AM") : F("PM");
       int hour12 = nextHour % 12 == 0 ? 12 : nextHour % 12;
-      chunk = F("<p>Next Dose: ") + String(dayNames[nextDay]) + F(", ") + String(hour12) + F(":") + (nextMinute < 10 ? F("0") : F("")) + String(nextMinute) + F(" ") + ampm + F("</p>");
+      chunk += F("<p>Next Dose: ") + String(dayNames[nextDay]) + F(", ") + String(hour12) + F(":") + (nextMinute < 10 ? F("0") : F("")) + String(nextMinute) + F(" ") + ampm + F("</p>");
       chunk += F("<p>Next Dose Volume: ") + String(nextVol) + F(" ml</p>");
     } else {
-      chunk = F("<p>Next Dose: N/A</p>");
+      chunk += F("<p>Next Dose: N/A</p>");
       chunk += F("<p>Next Dose Volume: N/A</p>");
     }
     chunk += F("<button onclick=\"location.href='/newUI/manageSchedule?channel=") + String(channel) + F("'\">Manage Schedule</button>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // Actions Card
-    chunk = F("<div class='card'>");
+    chunk += F("<div class='card'>");
     chunk += F("<button onclick=\"location.href='/prime?channel=") + String(channel) + F("'\">Prime Pump</button>");
     chunk += F("<button onclick=\"location.href='/calibrate?channel=") + String(channel) + F("'\">Calibrate</button>");
-    server.sendContent(chunk);
     
     // Rename UI
-    chunk = F("<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>");
+    chunk += F("<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>");
     chunk += F("<div id='rename-row' class='rename-row' style='display:none;'>");
     chunk += F("<input id='rename-input' class='rename-input' type='text' value='") + channelName + F("'>");
     chunk += F("<button class='rename-btn' onclick='saveRename(") + String(channel) + F(")'>Save</button>");
     chunk += F("<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>");
     chunk += F("</div>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // Back and Home buttons row
-    chunk = F("<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>");
+    chunk += F("<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>");
     chunk += F("<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     // Footer
-    chunk = generateFooter();
+    chunk += generateFooter();
     chunk += F("</body></html>");
     server.sendContent(chunk);
     
@@ -1096,9 +1036,9 @@ void setupWebServer() {
     String chunk = F("<html><head><title>Manage Schedule: ") + ws->channelName + F("</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
-    server.sendContent(chunk);
+    
     // JS chunk
-    chunk = F("<script>\n");
+    chunk += F("<script>\n");
     chunk += F("function copyMondayToOthers() {\n");
     chunk += F("  var enabled=document.getElementById('enabled0').checked;\n");
     chunk += F("  var time=document.getElementById('time0').value;\n");
@@ -1127,18 +1067,18 @@ void setupWebServer() {
     chunk += F("});\n");
     chunk += F("</script>\n");
     chunk += F("</head><body>");
-    server.sendContent(chunk);
+    
     // Header and card open
-    chunk = generateHeader("Manage Schedule : " + ws->channelName);
+    chunk += generateHeader("Manage Schedule : " + ws->channelName);
     chunk += F("<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>");
     chunk += F("<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=") + String(channel) + F("'>");
     chunk += F("<table style='width:100%;border-collapse:collapse;'>");
     chunk += F("<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>");
-    server.sendContent(chunk);
+    
     // Table rows chunked
     for (int i = 0; i < 7; ++i) {
       String rowShade = (i % 2 == 0) ? F("background:#f9f9f9;") : F("background:#fff;");
-      chunk = F("<tr style='") + rowShade + F("'>");
+      chunk += F("<tr style='") + rowShade + F("'>");
       chunk += F("<td>") + String(dayNames[i]) + F("</td>");
       chunk += F("<td><input type='checkbox' id='enabled") + String(i) + F("' name='enabled") + String(i) + F("'") + (ws->days[i].enabled ? F(" checked") : F("")) + F("></td>");
       char timebuf[6];
@@ -1146,10 +1086,10 @@ void setupWebServer() {
       chunk += F("<td><input type='time' id='time") + String(i) + F("' name='time") + String(i) + F("' value='") + String(timebuf) + F("'></td>");
       chunk += F("<td><input type='number' id='vol") + String(i) + F("' name='vol") + String(i) + F("' step='0.01' min='0' value='") + String(ws->days[i].volume, 2) + F("'></td>");
       chunk += F("</tr>");
-      server.sendContent(chunk);
     }
+    
     // After table
-    chunk = F("</table>");
+    chunk += F("</table>");
     chunk += F("<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>");
     chunk += String(F("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'")) + (ws->missedDoseCompensation ? F(" checked") : F("")) + F("><label for='missedDose'>Missed Dose Compensation</label></div>");
     chunk += F("<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>");
@@ -1158,16 +1098,16 @@ void setupWebServer() {
     chunk += F("</div>");
     chunk += F("</form>");
     chunk += F("</div>");
-    server.sendContent(chunk);
+    
     // Footer and scripts
-    chunk = generateFooter();
+    chunk += generateFooter();
     chunk += F("<script>\n");
     chunk += F("document.getElementById('scheduleForm').addEventListener('submit',function(e){\n");
     chunk += F("  if(document.getElementById('copyMonday').checked){\n");
     chunk += F("    var enabled=document.getElementById('enabled0').checked;\n");
     chunk += F("    var time=document.getElementById('time0').value;\n");
     chunk += F("    var vol=document.getElementById('vol0').value;\n");
-    chunk += F("    for(var i=1;i<7;i++){document.getElementById('enabled'+i).disabled=false;document.getElementById('time'+i).disabled=false;document.getElementById('vol'+i).disabled=false;document.getElementById('enabled'+i).checked=enabled;document.getElementById('time'+i).value=time;document.getElementById('vol'+i).value=vol;}\n");
+    chunk += F("    for(var i=1;i<7;i'){document.getElementById('enabled'+i).disabled=false;document.getElementById('time'+i).disabled=false;document.getElementById('vol'+i).disabled=false;document.getElementById('enabled'+i).checked=enabled;document.getElementById('time'+i).value=time;document.getElementById('vol'+i).value=vol;}\n");
     chunk += F("  }\n");
     chunk += F("});\n");
     chunk += F("document.getElementById('cancelBtn').addEventListener('click',function(){\n");
@@ -1208,7 +1148,7 @@ void setupWebServer() {
     // Get MAC address for default device name
     String mac = WiFi.macAddress();
     mac.replace(":", "");
-    String defaultDeviceName = "Doser_" + mac;
+    String defaultDeviceName = "Doser";
     if (deviceName == "") deviceName = defaultDeviceName;
     // Use global ntfyChannel
     // Use global notification variables directly instead of local ones
@@ -1224,93 +1164,74 @@ void setupWebServer() {
     String chunk = F("<html><head><title>System Settings</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ");
-    server.sendContent(chunk);
     
     // CSS in chunks
-    chunk = F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
+    chunk += F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
     chunk += F(".card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} ");
     chunk += F("label{display:block;margin-bottom:6px;font-weight:500;} ");
-    server.sendContent(chunk);
-    
-    chunk = F("input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} ");
+    chunk += F("input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} ");
     chunk += F(".section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} ");
-    server.sendContent(chunk);
-    
-    chunk = F(".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} ");
+    chunk += F(".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} ");
     chunk += F(".btn-row{display:flex;gap:10px;margin-top:18px;} ");
     chunk += F(".btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} ");
-    server.sendContent(chunk);
-    
-    chunk = F(".btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} ");
+    chunk += F(".btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} ");
     chunk += F(".btn:hover{background:#0056b3;} .btn.cancel:hover{background:#888;} .btn.danger:hover{background:#b30000;} .btn.update:hover{background:#218838;} ");
-    server.sendContent(chunk);
-    
-    chunk = F("</style></head><body>");
-    server.sendContent(chunk);
+    chunk += F("</style></head><body>");
     
     // Header
-    chunk = generateHeader("System Settings");
-    server.sendContent(chunk);
+    chunk += generateHeader("System Settings");
     
     // Form start and device settings
-    chunk = F("<form method='POST' action='/newUI/systemSettings'>");
+    chunk += F("<form method='POST' action='/newUI/systemSettings'>");
     chunk += F("<div class='card'>");
     chunk += F("<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='") + deviceName + F("'></div>");
-    server.sendContent(chunk);
 
     // Timezone dropdown
-    chunk = F("<div class='form-row'><label for='timezone'>Time Zone:</label><select name='timezone'>");
+    chunk += F("<div class='form-row'><label for='timezone'>Time Zone:</label><select name='timezone'>");
     int tzOffsets[] = {-43200,-39600,-36000,-32400,-28800,-25200,-21600,-18000,-14400,-10800,-7200,-3600,0,3600,7200,10800,14400,18000,19800,21600,25200,28800,32400,36000,39600,43200};
     String tzLabels[] = {"UTC-12:00","UTC-11:00","UTC-10:00","UTC-09:00","UTC-08:00 (PST)","UTC-07:00 (MST)","UTC-06:00 (CST)","UTC-05:00 (EST)","UTC-04:00","UTC-03:00","UTC-02:00","UTC-01:00","UTC+00:00","UTC+01:00","UTC+02:00","UTC+03:00","UTC+04:00","UTC+05:00","UTC+05:30 (IST)","UTC+06:00","UTC+07:00","UTC+08:00","UTC+09:00 (JST)","UTC+10:00","UTC+11:00","UTC+12:00"};
-    server.sendContent(chunk);
     
     // Send timezone options in smaller chunks
     for (int i = 0; i < 26; i += 5) {
-      chunk = F("");
+      chunk += F("");
       for (int j = i; j < i + 5 && j < 26; j++) {
         chunk += F("<option value='") + String(tzOffsets[j]) + F("'") + (timezoneOffset == tzOffsets[j] ? F(" selected") : F("")) + F(">") + tzLabels[j] + F("</option>");
       }
-      server.sendContent(chunk);
     }
     
-    chunk = F("</select></div>");
+    chunk += F("</select></div>");
     chunk += F("<div class='section-title'>Calibration Factor</div>");
     chunk += F("<div class='form-row'>Channel 1: <span style='font-weight:600;'>") + String(calib1, 2) + F("</span></div>");
     chunk += F("<div class='form-row'>Channel 2: <span style='font-weight:600;'>") + String(calib2, 2) + F("</span></div>");
-    server.sendContent(chunk);
     
     // Notifications section
-    chunk = F("<div class='section-title'>Notifications</div>");
+    chunk += F("<div class='section-title'>Notifications</div>");
     // NTFY Channel as read-only, default to MAC if empty
     String ntfyDefault = mac;
     chunk += F("<div class='form-row'><label for='ntfyChannel'>NTFY Channel:</label><input type='text' id='ntfyChannel' name='ntfyChannel' value='") + ntfyDefault + F("' readonly></div>");
     chunk += F("<div class='form-row'>Events to Notify:</div>");
-    server.sendContent(chunk);
     
-    chunk = F("<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert'") + String(notifyLowFert ? F(" checked") : F("")) + F("><label for='notifyLowFert'>Low Fertilizer Volume</label></div>");
+    chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert'") + String(notifyLowFert ? F(" checked") : F("")) + F("><label for='notifyLowFert'>Low Fertilizer Volume</label></div>");
     chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart'") + String(notifyStart ? F(" checked") : F("")) + F("><label for='notifyStart'>System Start</label></div>");
     chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose'") + String(notifyDose ? F(" checked") : F("")) + F("><label for='notifyDose'>Dose</label></div>");
-    server.sendContent(chunk);
     
     // Buttons
-    chunk = F("<div class='btn-row'>");
+    chunk += F("<div class='btn-row'>");
     chunk += F("<button type='submit' class='btn btn-main'>Save</button>");
     chunk += F("<button type='button' class='btn btn-cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button>");
     chunk += F("</div></div></form>"); // Close main form and card
-    server.sendContent(chunk);
 
     // Action buttons outside the main form
     // Each button spans the full width of the card, one per row, with reduced vertical spacing
-    chunk = F("<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>");
+    chunk += F("<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>");
     chunk += F("<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>");
     chunk += F("<form method='POST' action='/restart' style='width:100%;'><button type='submit' class='btn btn-main' style='width:100%;margin-bottom:0;'>Restart</button></form>");
     chunk += F("<form method='POST' action='/wifiReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>");
     chunk += F("<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>");
     chunk += F("</div>");
-    server.sendContent(chunk);
 
     // Update CSS for button consistency and centering
-    chunk = F("<style> ");
+    chunk += F("<style> ");
     chunk += F(".btn-row.card-action-row { display: flex; justify-content: center; align-items: center; gap: 10px; max-width: 500px; margin: 0 auto 16px auto; } ");
     chunk += F(".btn-row.card-action-row .btn { flex: unset; min-width: 120px; } ");
     chunk += F(".btn { padding:12px 0; font-size:1.1em; border:none; border-radius:6px; cursor:pointer; transition:background 0.2s; min-width:120px; margin:0 4px 8px 0; } ");
@@ -1323,31 +1244,27 @@ void setupWebServer() {
     chunk += F(".btn-danger:hover { background:#b30000; } ");
     chunk += F(".btn-update:hover { background:#218838; } ");
     chunk += F("</style>");
-    server.sendContent(chunk);
 
     // Firmware update section
-    chunk = F("<div id='firmwareUpdateSection' style='display:none;margin-top:20px;'>");
+    chunk += F("<div id='firmwareUpdateSection' style='display:none;margin-top:20px;'>");
     chunk += F("<div class='card'>");
     chunk += F("<h3>FW Update</h3>");
     chunk += F("<div class='form-row'><label for='firmwareUrl'>Firmware URL:</label>");
     chunk += F("<input type='text' id='firmwareUrl' value='ABC.com/fw.bin' style='width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;'></div>");
-    server.sendContent(chunk);
     
     chunk += F("<div class='btn-row'>");
     chunk += F("<button type='button' class='btn btn-update' onclick=\"updateFirmware()\">Update</button>");
     chunk += F("<button type='button' class='btn btn-cancel' onclick=\"hideFirmwareUpdate()\">Cancel</button>");
     chunk += F("</div>");
-    server.sendContent(chunk);
     
     chunk += F("<div id='updateProgress' style='margin-top:10px;display:none;'>");
     chunk += F("<div>Downloading firmware...</div>");
     chunk += F("<div id='progressBar' style='width:100%;background:#ddd;border-radius:6px;margin-top:5px;'>");
     chunk += F("<div id='progressFill' style='width:0%;height:20px;background:#007BFF;border-radius:6px;transition:width 0.3s;'></div>");
     chunk += F("</div><div id='progressText'>0%</div></div></div></div>");
-    server.sendContent(chunk);
     
     // JavaScript in smaller chunks
-    chunk = F("<script>");
+    chunk += F("<script>");
     chunk += F("function showFirmwareUpdate() {");
     chunk += F("  document.getElementById('firmwareUpdateSection').style.display = 'block';");
     chunk += F("}");
@@ -1355,7 +1272,6 @@ void setupWebServer() {
     chunk += F("  document.getElementById('firmwareUpdateSection').style.display = 'none';");
     chunk += F("  document.getElementById('updateProgress').style.display = 'none';");
     chunk += F("}");
-    server.sendContent(chunk);
     
     chunk += F("async function updateFirmware() {");
     chunk += F("  const url = document.getElementById('firmwareUrl').value;");
@@ -1363,7 +1279,6 @@ void setupWebServer() {
     chunk += F("  document.getElementById('updateProgress').style.display = 'block';");
     chunk += F("  const progressFill = document.getElementById('progressFill');");
     chunk += F("  const progressText = document.getElementById('progressText');");
-    server.sendContent(chunk);
     
     chunk += F("  try {");
     chunk += F("    const response = await fetch(url);");
@@ -1371,7 +1286,6 @@ void setupWebServer() {
     chunk += F("    const contentLength = response.headers.get('content-length');");
     chunk += F("    const total = parseInt(contentLength, 10);");
     chunk += F("    let loaded = 0; const reader = response.body.getReader(); const chunks = [];");
-    server.sendContent(chunk);
     
     chunk += F("    while (true) {");
     chunk += F("      const { done, value } = await reader.read();");
@@ -1382,7 +1296,6 @@ void setupWebServer() {
     chunk += F("        progressFill.style.width = progress + '%';");
     chunk += F("        progressText.textContent = Math.round(progress) + '%';");
     chunk += F("      }}");
-    server.sendContent(chunk);
     
     chunk += F("    const firmwareData = new Uint8Array(loaded);");
     chunk += F("    let offset = 0;");
@@ -1392,7 +1305,6 @@ void setupWebServer() {
     chunk += F("    progressText.textContent = 'Flashing firmware...';");
     chunk += F("    const formData = new FormData();");
     chunk += F("    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');");
-    server.sendContent(chunk);
     
     chunk += F("    const uploadResponse = await fetch('/update', {");
     chunk += F("      method: 'POST', body: formData");
@@ -1401,7 +1313,6 @@ void setupWebServer() {
     chunk += F("      progressText.textContent = 'Firmware updated successfully! Device will restart...';");
     chunk += F("      setTimeout(() => { window.location.href = '/newUI/summary'; }, 3000);");
     chunk += F("    } else { throw new Error('Failed to flash firmware'); }");
-    server.sendContent(chunk);
     
     chunk += F("  } catch (error) {");
     chunk += F("    alert('Firmware update failed: ' + error.message);");
@@ -1409,10 +1320,9 @@ void setupWebServer() {
     chunk += F("  }");
     chunk += F("}");
     chunk += F("</script>");
-    server.sendContent(chunk);
-    
+
     // Footer
-    chunk = generateFooter();
+    chunk += generateFooter();
     chunk += F("</body></html>");
     server.sendContent(chunk);
     
@@ -1457,6 +1367,7 @@ void handleCalibration() {
       
       // Show form to input dispensed amount
       String html = F("");
+      
       html += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
       html += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-label{font-size:1.1em;margin-bottom:8px;display:block;} .calib-input{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;margin-bottom:16px;} .calib-submit{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
       html += F("</head><body>");
