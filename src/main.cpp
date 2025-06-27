@@ -973,13 +973,15 @@ void setupWebServer() {
     chunk += F("<input id='rename-input' class='rename-input' type='text' value='") + channelName + F("'>");
     chunk += F("<button class='rename-btn' onclick='saveRename(") + String(channel) + F(")'>Save</button>");
     chunk += F("<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>");
+   
     chunk += F("</div>");
+    chunk += F("<button style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/summary'\">Home</button>");
+   
     chunk += F("</div>");
     
     // Back and Home buttons row
-    chunk += F("<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>");
-    chunk += F("<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/summary'\">Home</button>");
-    chunk += F("</div>");
+   // chunk += F("<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>");
+    //chunk += F("</div>");
     
     // Footer
     chunk += generateFooter();
@@ -1236,10 +1238,11 @@ void setupWebServer() {
     // Action buttons outside the main form
     // Each button spans the full width of the card, one per row, with reduced vertical spacing
     chunk += F("<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>");
-    chunk += F("<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>");
     chunk += F("<form method='POST' action='/restart' style='width:100%;'><button type='submit' class='btn btn-main' style='width:100%;margin-bottom:0;'>Restart</button></form>");
     chunk += F("<form method='POST' action='/wifiReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>");
     chunk += F("<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>");
+    chunk += F("<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>");
+    
     chunk += F("</div>");
 
     // Update CSS for button consistency and centering
@@ -1283,6 +1286,19 @@ void setupWebServer() {
     chunk += F("function hideFirmwareUpdate() {");
     chunk += F("  document.getElementById('firmwareUpdateSection').style.display = 'none';");
     chunk += F("  document.getElementById('updateProgress').style.display = 'none';");
+    chunk += F("}");
+    chunk += F("async function updateFirmware() {");
+    chunk += F("  const url = document.getElementById('firmwareUrl').value;");
+    chunk += F("  if (!url) { alert('Please enter firmware URL'); return; }");
+    chunk += F("  document.getElementById('updateProgress').style.display = 'block';");
+    chunk += F("  const progressFill = document.getElementById('progressFill');");
+    chunk += F("  const progressText = document.getElementById('progressText');");
+    chunk += F("  try {");
+    chunk += F("    const response = await fetch(url);");
+    chunk += F("    if (!response.ok) throw new Error('Failed to download firmware');");
+    chunk += F("    const total = parseInt(response.headers.get('content-length') || '0');");
+    chunk += F("    const reader = response.body.getReader();");
+    chunk += F("    const chunks = []; let loaded = 0;");
     
     chunk += F("    while (true) {");
     chunk += F("      const { done, value } = await reader.read();");
@@ -1812,7 +1828,7 @@ void handlePrimePump() {
 
 // Common header and footer generators
 String generateHeader(const String& title) {
-  String html = F("<div style='width:100%;background:#007BFF;color:#fff;padding:16px 0;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);margin-bottom:10px;'>");
+  String html = F("<div style='max-width:500px;margin:0 auto 10px auto;background:#007BFF;color:#fff;padding:16px 0;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);'>");
   html += title;
   html += F("</div>");
   return html;
