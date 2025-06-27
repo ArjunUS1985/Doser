@@ -151,6 +151,9 @@ bool notifyDose = false;
 bool calibratedChannel1 = false;
 bool calibratedChannel2 = false;
 
+// Add this global variable
+String lastNotifiedIP = "";
+
 // Function Prototypes
 void setupWiFi();
 void setupWebServer();
@@ -278,6 +281,50 @@ void loadWeeklySchedulesFromSPIFFS() {
   file.close();
 }
 
+// WiFi/Time retry variables
+unsigned long wifiRetryStart = 0;
+unsigned long lastWifiRetry = 0;
+unsigned long lastTimeSyncRetry = 0;
+bool apModeActive = false;
+int wifiRetryCount = 0;
+const int WIFI_RETRY_LIMIT = 30; // 30 minutes
+
+void setupWiFiWithRetry() {
+  WiFiManager wifiManager;
+  wifiManager.setAPCallback([](WiFiManager *myWiFiManager) {
+    Serial.println(F("Entered config mode"));
+    Serial.println(WiFi.softAPIP());
+    Serial.println(myWiFiManager->getConfigPortalSSID());
+  });
+  wifiManager.setConfigPortalTimeout(300);
+  wifiManager.setMinimumSignalQuality(10);
+  wifiManager.setAPStaticIPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+  wifiManager.setDebugOutput(true);
+  wifiManager.setCaptivePortalEnable(true);
+  wifiManager.setBreakAfterConfig(true);
+
+  wifiRetryStart = millis();
+  wifiRetryCount = 0;
+  while (wifiRetryCount < WIFI_RETRY_LIMIT) {
+    if (wifiManager.autoConnect("Doser_AP")) {
+      Serial.println(F("Connected to WiFi."));
+      Serial.print(F("IP Address: "));
+      Serial.println(WiFi.localIP());
+      apModeActive = false;
+      return;
+    } else {
+      wifiRetryCount++;
+      Serial.print(F("WiFi connect failed, retry "));
+      Serial.println(wifiRetryCount);
+      delay(60000); // 1 minute
+    }
+  }
+  // If we reach here, go to AP mode and stay
+  Serial.println(F("Failed to connect after retries, entering AP mode."));
+  wifiManager.startConfigPortal("Doser_AP");
+  apModeActive = true;
+}
+
 void setup() {
   // Initialize Serial
   Serial.begin(9600);
@@ -314,7 +361,7 @@ void setup() {
   Serial.print(F("[BOOT] lastDispensedTime2: ")); Serial.println(lastDispensedTime2);
 
   // Setup WiFi
-  setupWiFi();
+  setupWiFiWithRetry();
 
   // Setup Web Server
   setupWebServer();
@@ -350,6 +397,23 @@ void setup() {
     msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2));
     Serial.println(F("Sending System Start notification: ") + msg);
     sendNtfyNotification(deviceName+" Start", msg);
+  }
+
+  // Send Welcome notification when device comes out of AP mode and connects to WiFi
+  String currentIP = WiFi.localIP().toString();
+  if (WiFi.status() == WL_CONNECTED && WiFi.SSID() != "" && WiFi.getMode() != WIFI_AP && lastNotifiedIP != currentIP) {
+    String mDnsHost = deviceName;
+    mDnsHost.replace(" ", "-");
+    String welcomeMsg = F("Wifi Connection Successful. IP: ");
+    welcomeMsg += currentIP;
+    welcomeMsg += F("\nIf setting up for first time or resetting it's recommended to unplug the device and plug back again after 5 seconds. Post that you can manage the device at :\nhttp://");
+    welcomeMsg += mDnsHost;
+    welcomeMsg += F(".local/ OR http://");
+    welcomeMsg += currentIP;
+    welcomeMsg += F("/");
+    sendNtfyNotification(F("Your Doser got a new IP"), welcomeMsg);
+    lastNotifiedIP = currentIP;
+    savePersistentDataToSPIFFS();
   }
   // serial print time synced notifystart and wifistatus
   Serial.println(F("[BOOT] Time Synced: ") + String(timeSynced));
@@ -402,6 +466,30 @@ void loop() {
     }
     // Update LED state
     updateLEDState();
+  }
+  
+  // WiFi reconnect logic if lost after boot
+  static unsigned long lastWifiCheck = 0;
+  if (!apModeActive && WiFi.status() != WL_CONNECTED) {
+    if (millis() - lastWifiCheck > 60000) {
+      lastWifiCheck = millis();
+      Serial.println(F("WiFi lost, retrying connect..."));
+      WiFi.reconnect();
+    }
+  }
+  // Time sync retry logic
+  static unsigned long lastTimeSyncCheck = 0;
+  if (!timeSynced && WiFi.status() == WL_CONNECTED) {
+    if (millis() - lastTimeSyncCheck > 60000) {
+      lastTimeSyncCheck = millis();
+      timeClient.update();
+      if (timeClient.getEpochTime() > 100000) {
+        timeSynced = true;
+        Serial.println(F("Time sync successful (retry)"));
+      } else {
+        Serial.println(F("Time sync failed, will retry in 1 min"));
+      }
+    }
   }
   
   ArduinoOTA.handle();
@@ -1652,6 +1740,9 @@ void loadPersistentDataFromSPIFFS() {
   calibratedChannel1 = doc["calibratedChannel1"] | false;
   calibratedChannel2 = doc["calibratedChannel2"] | false;
 
+  // Load last notified IP (default to empty string)
+  lastNotifiedIP = doc["lastNotifiedIP"] | "";
+
   file.close();
   Serial.println(F("Loaded configuration from filesystem"));
 }
@@ -1696,6 +1787,9 @@ void savePersistentDataToSPIFFS() {
   // Save calibration status
   doc["calibratedChannel1"] = calibratedChannel1;
   doc["calibratedChannel2"] = calibratedChannel2;
+
+  // Save last notified IP
+  doc["lastNotifiedIP"] = lastNotifiedIP;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write JSON to file"));
@@ -1924,6 +2018,11 @@ void handleWiFiReset() {
   WiFiManager wifiManager;
   wifiManager.resetSettings();
   
+  // Wipe lastNotifiedIP and save
+  lastNotifiedIP = "";
+  savePersistentDataToSPIFFS();
+  //delay(1000);
+  delay(1000);
   // Restart ESP to enter AP mode
   ESP.restart();
 }
