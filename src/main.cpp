@@ -9,7 +9,7 @@
 #include <WiFiManager.h>
 #include <Adafruit_NeoPixel.h>
 #include <LittleFS.h>
-#include <ESP8266MDNS.h> // Include mDNS library
+#include <ESP8266mDNS.h> // Include mDNS library
 #include <ESP8266HTTPClient.h>
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
 
@@ -71,7 +71,7 @@ void setLEDState(LEDState state);
 void updateLED(uint32_t color);
 void handlePrimePump();
 // Function declarations for header and footer generators
-String generateHeader(String title);
+String generateHeader(const String& title);
 String generateFooter();
 // --- Weekly Schedule Data Structure ---
 struct DaySchedule {
@@ -180,17 +180,17 @@ const char* dayNames[7] = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday
 void saveWeeklySchedulesToSPIFFS() {
   File file = LittleFS.open("/weekly_schedules.json", "w");
   if (!file) {
-    Serial.println("Failed to open weekly_schedules.json for writing");
+    Serial.println(F("Failed to open weekly_schedules.json for writing"));
     return;
   }
-  DynamicJsonDocument doc(512);
+  JsonDocument doc;
   // Channel 1
-  JsonObject ch1 = doc.createNestedObject("ch1");
+  JsonObject ch1 = doc["ch1"].to<JsonObject>();
   ch1["channelName"] = weeklySchedule1.channelName;
   ch1["missedDoseCompensation"] = weeklySchedule1.missedDoseCompensation;
-  JsonArray days1 = ch1.createNestedArray("days");
+  JsonArray days1 = ch1["days"].to<JsonArray>();
   for (int i = 0; i < 7; ++i) {
-    JsonObject d = days1.createNestedObject();
+    JsonObject d = days1.add<JsonObject>();
     d["enabled"] = weeklySchedule1.days[i].enabled;
     d["hour"] = weeklySchedule1.days[i].hour;
     d["minute"] = weeklySchedule1.days[i].minute;
@@ -297,17 +297,17 @@ void setup() {
 
   // Initialize SPIFFS
   if (!SPIFFS.begin()) {
-    Serial.println("Failed to mount file system");
+    Serial.println(F("Failed to mount file system"));
     return;
   }
 
   // Load Persistent Data from SPIFFS
   loadPersistentDataFromSPIFFS();
   loadWeeklySchedulesFromSPIFFS();
-  Serial.print("[BOOT] lastDispensedVolume1: "); Serial.println(lastDispensedVolume1);
-  Serial.print("[BOOT] lastDispensedTime1: "); Serial.println(lastDispensedTime1);
-  Serial.print("[BOOT] lastDispensedVolume2: "); Serial.println(lastDispensedVolume2);
-  Serial.print("[BOOT] lastDispensedTime2: "); Serial.println(lastDispensedTime2);
+  Serial.print(F("[BOOT] lastDispensedVolume1: ")); Serial.println(lastDispensedVolume1);
+  Serial.print(F("[BOOT] lastDispensedTime1: ")); Serial.println(lastDispensedTime1);
+  Serial.print(F("[BOOT] lastDispensedVolume2: ")); Serial.println(lastDispensedVolume2);
+  Serial.print(F("[BOOT] lastDispensedTime2: ")); Serial.println(lastDispensedTime2);
 
   // Setup WiFi
   setupWiFi();
@@ -327,9 +327,9 @@ void setup() {
   String sanitizedDeviceName = deviceName;
   sanitizedDeviceName.replace(" ", "-"); // Replace spaces with hyphens for mDNS compatibility
   if (MDNS.begin(sanitizedDeviceName.c_str())) { // Use sanitized device name
-    Serial.println("mDNS responder started with hostname: " + sanitizedDeviceName);
+    Serial.println(F("mDNS responder started with hostname: ") + sanitizedDeviceName);
   } else {
-    Serial.println("Error setting up mDNS responder!");
+    Serial.println(F("Error setting up mDNS responder!"));
   }
 
   // Set LED to Green at the end of setup
@@ -344,13 +344,13 @@ void setup() {
     msg += "Device: " + deviceName + "\n";
     msg += channel1Name + ": " + String(remainingMLChannel1) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1)) + "\n";
     msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2));
-    Serial.println("Sending System Start notification: " + msg);
+    Serial.println(F("Sending System Start notification: ") + msg);
     sendNtfyNotification(deviceName+" Start", msg);
   }
   // serial print time synced notifystart and wifistatus
-  Serial.println("[BOOT] Time Synced: " + String(timeSynced));
-  Serial.println("[BOOT] WiFi Status: " + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected"));
-  Serial.println("[BOOT] Notification: " + String(notifyStart ? "Enabled" : "Disabled"));
+  Serial.println(F("[BOOT] Time Synced: ") + String(timeSynced));
+  Serial.println(F("[BOOT] WiFi Status: ") + String(WiFi.status() == WL_CONNECTED ? F("Connected") : F("Disconnected")));
+  Serial.println(F("[BOOT] Notification: ") + String(notifyStart ? F("Enabled") : F("Disabled")));
 }
 
 void loop() {
@@ -408,12 +408,12 @@ void setupWiFi() {
 
   // Automatically start configuration portal if no WiFi is configured
   if (!wifiManager.autoConnect("Doser_AP")) {
-    Serial.println("Failed to connect to WiFi and hit timeout");
+    Serial.println(F("Failed to connect to WiFi and hit timeout"));
     ESP.restart();
   }
 
-  Serial.println("Connected to WiFi.");
-  Serial.print("IP Address: ");
+  Serial.println(F("Connected to WiFi."));
+  Serial.print(F("IP Address: "));
   Serial.println(WiFi.localIP());
 
 }
@@ -431,83 +431,83 @@ void setupWebServer() {
     server.send(200, "text/html", "");
     
     // Send HTML header
-    String chunk = "<html><head><title>Calibrate</title>";
-    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    chunk += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ";
+    String chunk = F("<html><head><title>Calibrate</title>");
+    chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ");
     server.sendContent(chunk);
     
     // Send CSS in smaller chunks
-    chunk = ".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ";
-    chunk += ".card h2{margin-top:0;color:#007BFF;} ";
-    chunk += ".calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} ";
+    chunk = F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
+    chunk += F(".card h2{margin-top:0;color:#007BFF;} ");
+    chunk += F(".calib-warning{color:#b30000;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:10px;margin-bottom:18px;font-size:1.05em;} ");
     server.sendContent(chunk);
     
-    chunk = ".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ";
-    chunk += ".calib-btn:disabled{background:#aaa;cursor:not-allowed;} ";
-    chunk += ".home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} ";
+    chunk = F(".calib-btn{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;margin-bottom:10px;cursor:pointer;} ");
+    chunk += F(".calib-btn:disabled{background:#aaa;cursor:not-allowed;} ");
+    chunk += F(".home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} ");
     server.sendContent(chunk);
     
-    chunk = ".back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} ";
-    chunk += "#countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} ";
-    chunk += ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
+    chunk = F(".back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} ");
+    chunk += F("#countdown{font-size:1.2em;color:#007BFF;margin-bottom:10px;text-align:center;} ");
+    chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
     server.sendContent(chunk);
     
-    chunk = ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
-    chunk += ".prime-btn.stop:hover { background-color: #218838 !important; } ";
-    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }";
-    chunk += "</style>";
+    chunk = F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
+    chunk += F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
+    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }");
+    chunk += F("</style>");
     server.sendContent(chunk);
     
     // Send JavaScript
-    chunk = "<script>\n";
-    chunk += "function startCountdown() {\n";
-    chunk += "  var btn = document.getElementById('calibBtn');\n";
-    chunk += "  var homeBtn = document.getElementById('homeBtn');\n";
-    chunk += "  var backBtn = document.getElementById('backBtn');\n";
-    chunk += "  var countdown = document.getElementById('countdown');\n";
+    chunk = F("<script>\n");
+    chunk += F("function startCountdown() {\n");
+    chunk += F("  var btn = document.getElementById('calibBtn');\n");
+    chunk += F("  var homeBtn = document.getElementById('homeBtn');\n");
+    chunk += F("  var backBtn = document.getElementById('backBtn');\n");
+    chunk += F("  var countdown = document.getElementById('countdown');\n");
     server.sendContent(chunk);
     
-    chunk = "  btn.disabled = true;\n";
-    chunk += "  homeBtn.disabled = true;\n";
-    chunk += "  backBtn.disabled = true;\n";
-    chunk += "  var timeLeft = 15;\n";
-    chunk += "  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
-    chunk += "  var interval = setInterval(function() {\n";
+    chunk = F("  btn.disabled = true;\n");
+    chunk += F("  homeBtn.disabled = true;\n");
+    chunk += F("  backBtn.disabled = true;\n");
+    chunk += F("  var timeLeft = 15;\n");
+    chunk += F("  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n");
+    chunk += F("  var interval = setInterval(function() {\n");
     server.sendContent(chunk);
     
-    chunk = "    timeLeft--;\n";
-    chunk += "    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n";
-    chunk += "    if (timeLeft <= 0) {\n";
-    chunk += "      clearInterval(interval);\n";
-    chunk += "      countdown.innerText = '';\n";
-    chunk += "      btn.disabled = false;\n";
-    chunk += "      homeBtn.disabled = false;\n";
-    chunk += "      backBtn.disabled = false;\n";
+    chunk = F("    timeLeft--;\n");
+    chunk += F("    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n");
+    chunk += F("    if (timeLeft <= 0) {\n");
+    chunk += F("      clearInterval(interval);\n");
+    chunk += F("      countdown.innerText = '';\n");
+    chunk += F("      btn.disabled = false;\n");
+    chunk += F("      homeBtn.disabled = false;\n");
+    chunk += F("      backBtn.disabled = false;\n");
     server.sendContent(chunk);
     
-    chunk = "    }\n";
-    chunk += "  }, 1000);\n";
-    chunk += "}\n";
-    chunk += "function onSubmitCalib(e){\n";
-    chunk += "  startCountdown();\n";
-    chunk += "}\n";
-    chunk += "</script>";
-    chunk += "</head><body>";
+    chunk = F("    }\n");
+    chunk += F("  }, 1000);\n");
+    chunk += F("}\n");
+    chunk += F("function onSubmitCalib(e){\n");
+    chunk += F("  startCountdown();\n");
+    chunk += F("}\n");
+    chunk += F("</script>");
+    chunk += F("</head><body>");
     chunk += generateHeader("Calibrate: " + channelName);
-    chunk += "<div class='card'>";
-    chunk += "<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>";
+    chunk += F("<div class='card'>");
+    chunk += F("<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>");
     server.sendContent(chunk);
     
-    chunk = "<div id='countdown'></div>";
-    chunk += "<form action='/calibrate?channel=" + String(channel) + "' method='POST' onsubmit='onSubmitCalib(event)'>";
-    chunk += "<input type='hidden' name='channel' value='" + String(channel) + "'>";
-    chunk += "<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>";
-    chunk += "</form>";
-    chunk += "<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-    chunk += "<button class='back-btn' id='backBtn' onclick=\"history.back()\">Back</button>";
-    chunk += "</div>";
+    chunk = F("<div id='countdown'></div>");
+    chunk += F("<form action='/calibrate?channel=") + String(channel) + F("' method='POST' onsubmit='onSubmitCalib(event)'>");
+    chunk += F("<input type='hidden' name='channel' value='") + String(channel) + F("'>");
+    chunk += F("<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>");
+    chunk += F("</form>");
+    chunk += F("<button class='home-btn' id='homeBtn' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+    chunk += F("<button class='back-btn' id='backBtn' onclick=\"history.back()\">Back</button>");
+    chunk += F("</div>");
     chunk += generateFooter();
-    chunk += "</body></html>";
+    chunk += F("</body></html>");
     server.sendContent(chunk);
     
     // End the response
@@ -517,14 +517,14 @@ void setupWebServer() {
   
 
   server.on("/reset", HTTP_GET, []() {
-    String html = "<html><head><title>System Reset</title></head><body>";
-    html += "<h1>System Reset</h1>";
-    html += "<p>Click the button below to reset the system.</p>";
-    html += "<form action='/reset' method='POST'>";
-    html += "<input type='submit' value='Reset System'>";
-    html += "</form>";
-    html += "<p><a href='/'>Back to Home</a></p>";
-    html += "</body></html>";
+    String html = F("<html><head><title>System Reset</title></head><body>");
+    html += F("<h1>System Reset</h1>");
+    html += F("<p>Click the button below to reset the system.</p>");
+    html += F("<form action='/reset' method='POST'>");
+    html += F("<input type='submit' value='Reset System'>");
+    html += F("</form>");
+    html += F("<p><a href='/'>Back to Home</a></p>");
+    html += F("</body></html>");
     server.send(200, "text/html", html);
   });
 
@@ -535,9 +535,9 @@ void setupWebServer() {
       timezoneOffset = server.arg("offset").toInt();
       timeClient.setTimeOffset(timezoneOffset);
       savePersistentDataToSPIFFS();
-      server.send(200, "application/json", "{\"status\":\"timezone updated\"}");
+      server.send(200, "application/json", F("{\"status\":\"timezone updated\"}"));
     } else {
-      server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+      server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
     }
   });
 
@@ -558,102 +558,101 @@ void setupWebServer() {
     server.send(200, "text/html", "");
     
     // Send HTML header
-    String chunk = "<html><head>";
-    chunk += "<title>Prime Pump</title>";
-    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    chunk += "<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } ";
+    String chunk = F("<html><head>");
+    chunk += F("<title>Prime Pump</title>");
+    chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    chunk += F("<style>body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; } ");
     server.sendContent(chunk);
     
     // CSS in chunks
-    chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } ";
-    chunk += ".card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } ";
+    chunk = F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); } ");
+    chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .prime-warning { color: #b30000; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 10px; margin-bottom: 18px; font-size: 1.05em; } ");
     server.sendContent(chunk);
     
-    chunk = ".prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } ";
-    chunk += ".prime-btn.stop { background: #28a745; } ";
-    chunk += ".prime-btn:active { opacity: 0.9; } ";
-    chunk += ".home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } ";
+    chunk = F(".prime-btn { width: 100%; padding: 14px 0; font-size: 1.1em; background: #dc3545; color: #fff; border: none; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: background 0.2s; } ");
+    chunk += F(".prime-btn.stop { background: #28a745; } ");
+    chunk += F(".prime-btn:active { opacity: 0.9; } ");
+    chunk += F(".home-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #007BFF; color: #fff; border: none; border-radius: 6px; } ");
     server.sendContent(chunk);
     
-    chunk = ".back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } ";
-    chunk += ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
-    chunk += ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
+    chunk = F(".back-btn { width: 100%; padding: 12px 0; font-size: 1.1em; background: #aaa; color: #fff; border: none; border-radius: 6px; margin-top: 10px; } ");
+    chunk += F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
+    chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
     server.sendContent(chunk);
     
-    chunk = ".prime-btn.stop:hover { background-color: #218838 !important; } ";
-    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }";
-    chunk += "</style>";
+    chunk = F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
+    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }");
+    chunk += F("</style>");
     server.sendContent(chunk);
     
     // JavaScript
-    chunk = "<script>\n";
-    chunk += "function togglePrime() {\n";
-    chunk += "  var btn = document.getElementById('primeButton');\n";
-    chunk += "  var state = btn.getAttribute('data-state') === '1' ? '0' : '1';\n";
-    chunk += "  var xhr = new XMLHttpRequest();\n";
-    chunk += "  xhr.open('POST', '/prime', true);\n";
-    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    chunk += "  xhr.send('channel=" + String(channel) + "&state=' + state);\n";
-    chunk += "  btn.setAttribute('data-state', state);\n";
-    chunk += "  btn.value = state === '1' ? 'Done' : 'Start';\n";
-    chunk += "  btn.className = state === '1' ? 'prime-btn stop' : 'prime-btn';\n";
-    chunk += "}\n";
+    chunk = F("<script>\n");
+    chunk += F("function togglePrime() {\n");
+    chunk += F("  var btn = document.getElementById('primeButton');\n");
+    chunk += F("  var state = btn.getAttribute('data-state') === '1' ? '0' : '1';\n");
+    chunk += F("  var xhr = new XMLHttpRequest();\n");
+    chunk += F("  xhr.open('POST', '/prime', true);\n");
+    chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
+    chunk += F("  xhr.send('channel=") + String(channel) + F("&state=' + state);\n");
+    chunk += F("  btn.setAttribute('data-state', state);\n");
+    chunk += F("  btn.value = state === '1' ? 'Done' : 'Start';\n");
+    chunk += F("  btn.className = state === '1' ? 'prime-btn stop' : 'prime-btn';\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "window.onload = function() {\n";
-    chunk += "  var btn = document.getElementById('primeButton');\n";
-    chunk += "  btn.value = 'Start';\n";
-    chunk += "  btn.className = 'prime-btn';\n";
-    chunk += "}\n";
-    chunk += "</script>";
-    chunk += "</head><body>";
+    chunk = F("window.onload = function() {\n");
+    chunk += F("  var btn = document.getElementById('primeButton');\n");
+    chunk += F("  btn.value = 'Start';\n");
+    chunk += F("  btn.className = 'prime-btn';\n");
+    chunk += F("}\n");
+    chunk += F("</script>");
+    chunk += F("</head><body>");
     server.sendContent(chunk);
     
     // Body content
     chunk = generateHeader("Prime Pump: " + channelName);
-    chunk += "<div class='card'>";
-    chunk += "<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>";
-    chunk += "<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>";
-    chunk += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-    chunk += "<button class='back-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;' onclick=\"history.back()\">Back</button>";
-    chunk += "</div>";
+    chunk += F("<div class='card'>");
+    chunk += F("<div class='prime-warning'>Warning: This action will turn on the pump and liquid will flow. Please ensure tubing is connected and ready.</div>");
+    chunk += F("<input type='button' id='primeButton' data-state='0' value='Start' class='prime-btn' onclick='togglePrime()'>");
+    chunk += F("<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+    chunk += F("<button class='back-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;' onclick=\"history.back()\">Back</button>");
+    chunk += F("</div>");
     chunk += generateFooter();
-    chunk += "</body></html>";
+    chunk += F("</body></html>");
     server.sendContent(chunk);
     
     // End chunked response
     server.sendContent("");
   });
 
-
   server.on("/newUI/summary", HTTP_GET, []() {
-    Serial.print("[SUMMARY] lastDispensedVolume1: "); Serial.println(lastDispensedVolume1);
-    Serial.print("[SUMMARY] lastDispensedTime1: "); Serial.println(lastDispensedTime1);
-    Serial.print("[SUMMARY] lastDispensedVolume2: "); Serial.println(lastDispensedVolume2);
-    Serial.print("[SUMMARY] lastDispensedTime2: "); Serial.println(lastDispensedTime2);
+    Serial.print(F("[SUMMARY] lastDispensedVolume1: ")); Serial.println(lastDispensedVolume1);
+    Serial.print(F("[SUMMARY] lastDispensedTime1: ")); Serial.println(lastDispensedTime1);
+    Serial.print(F("[SUMMARY] lastDispensedVolume2: ")); Serial.println(lastDispensedVolume2);
+    Serial.print(F("[SUMMARY] lastDispensedTime2: ")); Serial.println(lastDispensedTime2);
     
     // Start chunked response
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "text/html", "");
     
     // Send HTML header
-    String chunk = "<html><head><title>Dosing Summary</title>";
-    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    chunk += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ";
+    String chunk = F("<html><head><title>Dosing Summary</title>");
+    chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    chunk += F("<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ");
     server.sendContent(chunk);
     
     // Send CSS in chunks
-    chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ";
-    chunk += ".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ";
+    chunk = F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
+    chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ");
     server.sendContent(chunk);
     
-    chunk = ".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ";
-    chunk += "border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ";
+    chunk = F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
+    chunk += F("border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ");
     server.sendContent(chunk);
     
-    chunk = ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
-    chunk += ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
-    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>";
+    chunk = F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
+    chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
+    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>");
     server.sendContent(chunk);
     
     // Generate header
@@ -681,22 +680,22 @@ void setupWebServer() {
       moreThanYear1 = true;
     }
     
-    chunk = "<div class='card'>";
-    chunk += "<h2>" + channel1Name + "</h2>";
-    chunk += "<p>Last Dosed Time: " + lastDispensedTime1 + "</p>";
-    chunk += "<p>Last Volume: " + String(lastDispensedVolume1) + " ml</p>";
-    chunk += "<p>Remaining Volume: " + String(remainingMLChannel1) + " ml</p>";
-    chunk += "<p>Days Remaining: ";
-    if (moreThanYear1) chunk += "More than a year";
+    chunk = F("<div class='card'>");
+    chunk += F("<h2>") + channel1Name + F("</h2>");
+    chunk += F("<p>Last Dosed Time: ") + lastDispensedTime1 + F("</p>");
+    chunk += F("<p>Last Volume: ") + String(lastDispensedVolume1) + F(" ml</p>");
+    chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel1) + F(" ml</p>");
+    chunk += F("<p>Days Remaining: ");
+    if (moreThanYear1) chunk += F("More than a year");
     else chunk += String(simulatedDays1);
-    chunk += "</p>";
+    chunk += F("</p>");
     server.sendContent(chunk);
     
-    chunk = "<div id='manualDoseSection1'>";
-    chunk += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>";
-    chunk += "</div>";
-    chunk += "<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>";
-    chunk += "</div>";
+    chunk = F("<div id='manualDoseSection1'>");
+    chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>");
+    chunk += F("</div>");
+    chunk += F("<button onclick=\"location.href='/newUI/manageChannel?channel=1'\">Manage Channel 1</button>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // Channel 2 Summary
@@ -720,29 +719,29 @@ void setupWebServer() {
       moreThanYear2 = true;
     }
     
-    chunk = "<div class='card'>";
-    chunk += "<h2>" + channel2Name + "</h2>";
-    chunk += "<p>Last Dosed Time: " + lastDispensedTime2 + "</p>";
-    chunk += "<p>Last Volume: " + String(lastDispensedVolume2) + " ml</p>";
-    chunk += "<p>Remaining Volume: " + String(remainingMLChannel2) + " ml</p>";
-    chunk += "<p>Days Remaining: ";
-    if (moreThanYear2) chunk += "More than a year";
+    chunk = F("<div class='card'>");
+    chunk += F("<h2>") + channel2Name + F("</h2>");
+    chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
+    chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
+    chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
+    chunk += F("<p>Days Remaining: ");
+    if (moreThanYear2) chunk += F("More than a year");
     else chunk += String(simulatedDays2);
-    chunk += "</p>";
+    chunk += F("</p>");
     server.sendContent(chunk);
     
-    chunk = "<div id='manualDoseSection2'>";
-    chunk += "<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>";
-    chunk += "</div>";
-    chunk += "<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>";
-    chunk += "</div>";
+    chunk = F("<div id='manualDoseSection2'>");
+    chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>");
+    chunk += F("</div>");
+    chunk += F("<button onclick=\"location.href='/newUI/manageChannel?channel=2'\">Manage Channel 2</button>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // System Time and Actions
-    chunk = "<div class='card'>";
-    chunk += "<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>";
-    chunk += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>" + getFormattedTime() + "</span></div>";
-    chunk += "</div>";
+    chunk = F("<div class='card'>");
+    chunk += F("<button onclick=\"location.href='/newUI/systemSettings'\">System Settings</button>");
+    chunk += F("<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'><span style='font-size:0.95em;color:#666;'>System Time:</span><span style='font-size:0.95em;color:#333;'>") + getFormattedTime() + F("</span></div>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // Generate footer
@@ -750,75 +749,75 @@ void setupWebServer() {
     server.sendContent(chunk);
     
     // JavaScript
-    chunk = "<script>\n";
-    chunk += "function showManualDose1() {\n";
-    chunk += "  var s = document.getElementById('manualDoseSection1');\n";
-    chunk += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
-    chunk += "}\n";
+    chunk = F("<script>\n");
+    chunk += F("function showManualDose1() {\n");
+    chunk += F("  var s = document.getElementById('manualDoseSection1');\n");
+    chunk += F("  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function showManualDose2() {\n";
-    chunk += "  var s = document.getElementById('manualDoseSection2');\n";
-    chunk += "  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol2' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow2()'>Dose</button><button id='cancelBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose2()'>Cancel</button></div><div id='doseCountdown2' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n";
-    chunk += "}\n";
+    chunk = F("function showManualDose2() {\n");
+    chunk += F("  var s = document.getElementById('manualDoseSection2');\n");
+    chunk += F("  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol2' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow2()'>Dose</button><button id='cancelBtn2' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose2()'>Cancel</button></div><div id='doseCountdown2' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function cancelManualDose1() {\n";
-    chunk += "  var s = document.getElementById('manualDoseSection1');\n";
-    chunk += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>`;\n";
-    chunk += "}\n";
-    chunk += "function cancelManualDose2() {\n";
-    chunk += "  var s = document.getElementById('manualDoseSection2');\n";
-    chunk += "  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>`;\n";
-    chunk += "}\n";
+    chunk = F("function cancelManualDose1() {\n");
+    chunk += F("  var s = document.getElementById('manualDoseSection1');\n");
+    chunk += F("  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose1()'>Manual Dose</button>`;\n");
+    chunk += F("}\n");
+    chunk += F("function cancelManualDose2() {\n");
+    chunk += F("  var s = document.getElementById('manualDoseSection2');\n");
+    chunk += F("  s.innerHTML = `<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>`;\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function doseNow1() {\n";
-    chunk += "  var vol = parseFloat(document.getElementById('doseVol1').value);\n";
-    chunk += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
-    chunk += "  var btn = document.getElementById('doseBtn1');\n";
-    chunk += "  var cancel = document.getElementById('cancelBtn1');\n";
-    chunk += "  btn.disabled = true; cancel.disabled = true;\n";
-    chunk += "  var countdown = document.getElementById('doseCountdown1');\n";
-    chunk += "  var duration = Math.ceil(vol * " + String(calibrationFactor1) + " / 1000);\n";
-    chunk += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    chunk = F("function doseNow1() {\n");
+    chunk += F("  var vol = parseFloat(document.getElementById('doseVol1').value);\n");
+    chunk += F("  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n");
+    chunk += F("  var btn = document.getElementById('doseBtn1');\n");
+    chunk += F("  var cancel = document.getElementById('cancelBtn1');\n");
+    chunk += F("  btn.disabled = true; cancel.disabled = true;\n");
+    chunk += F("  var countdown = document.getElementById('doseCountdown1');\n");
+    chunk += F("  var duration = Math.ceil(vol * ") + String(calibrationFactor1) + F(" / 1000);\n");
+    chunk += F("  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
     server.sendContent(chunk);
     
-    chunk = "  var interval = setInterval(function() {\n";
-    chunk += "    duration--;\n";
-    chunk += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
-    chunk += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
-    chunk += "  }, 1000);\n";
-    chunk += "  var xhr = new XMLHttpRequest();\n";
-    chunk += "  xhr.open('POST', '/manual', true);\n";
-    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    chunk += "  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n";
-    chunk += "}\n";
+    chunk = F("  var interval = setInterval(function() {\n");
+    chunk += F("    duration--;\n");
+    chunk += F("    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
+    chunk += F("    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n");
+    chunk += F("  }, 1000);\n");
+    chunk += F("  var xhr = new XMLHttpRequest();\n");
+    chunk += F("  xhr.open('POST', '/manual', true);\n");
+    chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
+    chunk += F("  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function doseNow2() {\n";
-    chunk += "  var vol = parseFloat(document.getElementById('doseVol2').value);\n";
-    chunk += "  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n";
-    chunk += "  var btn = document.getElementById('doseBtn2');\n";
-    chunk += "  var cancel = document.getElementById('cancelBtn2');\n";
-    chunk += "  btn.disabled = true; cancel.disabled = true;\n";
-    chunk += "  var countdown = document.getElementById('doseCountdown2');\n";
-    chunk += "  var duration = Math.ceil(vol * " + String(calibrationFactor2) + " / 1000);\n";
-    chunk += "  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
+    chunk = F("function doseNow2() {\n");
+    chunk += F("  var vol = parseFloat(document.getElementById('doseVol2').value);\n");
+    chunk += F("  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n");
+    chunk += F("  var btn = document.getElementById('doseBtn2');\n");
+    chunk += F("  var cancel = document.getElementById('cancelBtn2');\n");
+    chunk += F("  btn.disabled = true; cancel.disabled = true;\n");
+    chunk += F("  var countdown = document.getElementById('doseCountdown2');\n");
+    chunk += F("  var duration = Math.ceil(vol * ") + String(calibrationFactor2) + F(" / 1000);\n");
+    chunk += F("  countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
     server.sendContent(chunk);
     
-    chunk = "  var interval = setInterval(function() {\n";
-    chunk += "    duration--;\n";
-    chunk += "    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n";
-    chunk += "    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n";
-    chunk += "  }, 1000);\n";
-    chunk += "  var xhr = new XMLHttpRequest();\n";
-    chunk += "  xhr.open('POST', '/manual', true);\n";
-    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    chunk += "  xhr.send('channel=2&ml=' + encodeURIComponent(vol));\n";
-    chunk += "}\n";
-    chunk += "</script>\n";
-    chunk += "</body></html>";
+    chunk = F("  var interval = setInterval(function() {\n");
+    chunk += F("    duration--;\n");
+    chunk += F("    countdown.innerText = 'Dosing... ' + duration + 's remaining';\n");
+    chunk += F("    if (duration <= 0) { clearInterval(interval); countdown.innerText = ''; window.location.reload(); }\n");
+    chunk += F("  }, 1000);\n");
+    chunk += F("  var xhr = new XMLHttpRequest();\n");
+    chunk += F("  xhr.open('POST', '/manual', true);\n");
+    chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
+    chunk += F("  xhr.send('channel=2&ml=' + encodeURIComponent(vol));\n");
+    chunk += F("}\n");
+    chunk += F("</script>\n");
+    chunk += F("</body></html>");
     server.sendContent(chunk);
     
     // End the chunked response
@@ -841,93 +840,93 @@ void setupWebServer() {
     server.send(200, "text/html", "");
     
     // Send HTML header
-    String chunk = "<html><head><title>Channel Management: " + channelName + "</title>";
-    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    chunk += "<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ";
+    String chunk = F("<html><head><title>Channel Management: ") + channelName + F("</title>");
+    chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    chunk += F("<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ");
     server.sendContent(chunk);
     
     // CSS in chunks
-    chunk = ".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ";
-    chunk += ".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ";
+    chunk = F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
+    chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ");
     server.sendContent(chunk);
     
-    chunk = ".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ";
-    chunk += "border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ";
+    chunk = F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
+    chunk += F("border: none; border-radius: 5px; cursor: pointer; } .card button:hover { background-color: #0056b3; } ");
     server.sendContent(chunk);
     
-    chunk = ".header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } ";
-    chunk += ".rename-input { flex:1; padding:8px 12px; font-size:1em; border-radius:4px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; } ";
+    chunk = F(".header-action { float:right; margin-top:-8px; } .rename-row { display:flex; gap:8px; } ");
+    chunk += F(".rename-input { flex:1; padding:8px 12px; font-size:1em; border-radius:4px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; } ");
     server.sendContent(chunk);
     
-    chunk = ".rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } ";
-    chunk += ".rename-btn.cancel { background:#aaa; } .rename-row { display:flex; gap:8px; align-items:center; justify-content:center; } ";
+    chunk = F(".rename-btn { padding:8px 16px; font-size:1em; border-radius:4px; border:none; background:#007BFF; color:#fff; cursor:pointer; } ");
+    chunk += F(".rename-btn.cancel { background:#aaa; } .rename-row { display:flex; gap:8px; align-items:center; justify-content:center; } ");
     server.sendContent(chunk);
     
-    chunk = ".rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } ";
-    chunk += ".rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } ";
+    chunk = F(".rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } ");
+    chunk += F(".rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } ");
     server.sendContent(chunk);
     
-    chunk = ".rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } ";
-    chunk += "button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } ";
+    chunk = F(".rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } ");
+    chunk += F("button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } ");
     server.sendContent(chunk);
     
-    chunk = ".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ";
-    chunk += ".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ";
-    chunk += ".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
+    chunk = F(".card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } ");
+    chunk += F(".card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } ");
+    chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
     server.sendContent(chunk);
     
     // JavaScript
-    chunk = "<script>\n";
-    chunk += "function showRenameBox() {\n";
-    chunk += "  document.getElementById('rename-row').style.display = 'flex';\n";
-    chunk += "  document.getElementById('rename-btn-row').style.display = 'none';\n";
-    chunk += "}\n";
+    chunk = F("<script>\n");
+    chunk += F("function showRenameBox() {\n");
+    chunk += F("  document.getElementById('rename-row').style.display = 'flex';\n");
+    chunk += F("  document.getElementById('rename-btn-row').style.display = 'none';\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function cancelRename() {\n";
-    chunk += "  document.getElementById('rename-row').style.display = 'none';\n";
-    chunk += "  document.getElementById('rename-btn-row').style.display = 'block';\n";
-    chunk += "}\n";
+    chunk = F("function cancelRename() {\n");
+    chunk += F("  document.getElementById('rename-row').style.display = 'none';\n");
+    chunk += F("  document.getElementById('rename-btn-row').style.display = 'block';\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function saveRename(channel) {\n";
-    chunk += "  var newName = document.getElementById('rename-input').value;\n";
-    chunk += "  if (!newName) { alert('Name cannot be empty'); return; }\n";
-    chunk += "  var xhr = new XMLHttpRequest();\n";
-    chunk += "  xhr.open('POST', '/newUI/renameChannel', true);\n";
-    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    chunk += "  xhr.onreadystatechange = function() {\n";
-    chunk += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
-    chunk += "  };\n";
-    chunk += "  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n";
-    chunk += "}\n";
+    chunk = F("function saveRename(channel) {\n");
+    chunk += F("  var newName = document.getElementById('rename-input').value;\n");
+    chunk += F("  if (!newName) { alert('Name cannot be empty'); return; }\n");
+    chunk += F("  var xhr = new XMLHttpRequest();\n");
+    chunk += F("  xhr.open('POST', '/newUI/renameChannel', true);\n");
+    chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
+    chunk += F("  xhr.onreadystatechange = function() {\n");
+    chunk += F("    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n");
+    chunk += F("  };\n");
+    chunk += F("  xhr.send('channel=' + channel + '&name=' + encodeURIComponent(newName));\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function showUpdateVolumeBox() {\n";
-    chunk += "  document.getElementById('update-volume-row').style.display = 'flex';\n";
-    chunk += "  document.getElementById('update-volume-btn-row').style.display = 'none';\n";
-    chunk += "}\n";
+    chunk = F("function showUpdateVolumeBox() {\n");
+    chunk += F("  document.getElementById('update-volume-row').style.display = 'flex';\n");
+    chunk += F("  document.getElementById('update-volume-btn-row').style.display = 'none';\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function cancelUpdateVolume() {\n";
-    chunk += "  document.getElementById('update-volume-row').style.display = 'none';\n";
-    chunk += "  document.getElementById('update-volume-btn-row').style.display = 'inline';\n";
-    chunk += "}\n";
+    chunk = F("function cancelUpdateVolume() {\n");
+    chunk += F("  document.getElementById('update-volume-row').style.display = 'none';\n");
+    chunk += F("  document.getElementById('update-volume-btn-row').style.display = 'inline';\n");
+    chunk += F("}\n");
     server.sendContent(chunk);
     
-    chunk = "function saveUpdateVolume(channel) {\n";
-    chunk += "  var newVol = document.getElementById('update-volume-input').value;\n";
-    chunk += "  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n";
-    chunk += "  var xhr = new XMLHttpRequest();\n";
-    chunk += "  xhr.open('POST', '/newUI/updateVolume', true);\n";
-    chunk += "  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n";
-    chunk += "  xhr.onreadystatechange = function() {\n";
-    chunk += "    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n";
-    chunk += "  };\n";
-    chunk += "  xhr.send('channel=' + channel + '&volume=' + encodeURIComponent(newVol));\n";
-    chunk += "}\n";
-    chunk += "</script>\n";
-    chunk += "</head><body>";
+    chunk = F("function saveUpdateVolume(channel) {\n");
+    chunk += F("  var newVol = document.getElementById('update-volume-input').value;\n");
+    chunk += F("  if (!newVol || isNaN(newVol) || Number(newVol) < 0) { alert('Enter a valid volume'); return; }\n");
+    chunk += F("  var xhr = new XMLHttpRequest();\n");
+    chunk += F("  xhr.open('POST', '/newUI/updateVolume', true);\n");
+    chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
+    chunk += F("  xhr.onreadystatechange = function() {\n");
+    chunk += F("    if (xhr.readyState == 4 && xhr.status == 200) { location.reload(); }\n");
+    chunk += F("  };\n");
+    chunk += F("  xhr.send('channel=' + channel + '&volume=' + encodeURIComponent(newVol));\n");
+    chunk += F("}\n");
+    chunk += F("</script>\n");
+    chunk += F("</head><body>");
     server.sendContent(chunk);
     
     // Header
@@ -957,28 +956,28 @@ void setupWebServer() {
     }
     
     // Status Card
-    chunk = "<div class='card'>";
-    chunk += "<h2>Status</h2>";
-    chunk += "<p>Last Dosed: " + lastDispensedTime + "</p>";
-    chunk += "<p>Last Volume: " + String(lastDispensedVolume) + " ml</p>";
-    chunk += "<p>Remaining Volume: <span id='remaining-volume-label'>" + String(remainingML) + " ml (";
-    if (moreThanYear) chunk += "More than a year";
-    else chunk += String(simulatedDays) + " days";
-    chunk += ")</span> ";
+    chunk = F("<div class='card'>");
+    chunk += F("<h2>Status</h2>");
+    chunk += F("<p>Last Dosed: ") + lastDispensedTime + F("</p>");
+    chunk += F("<p>Last Volume: ") + String(lastDispensedVolume) + F(" ml</p>");
+    chunk += F("<p>Remaining Volume: <span id='remaining-volume-label'>") + String(remainingML) + F(" ml (");
+    if (moreThanYear) chunk += F("More than a year");
+    else chunk += String(simulatedDays) + F(" days");
+    chunk += F(")</span> ");
     server.sendContent(chunk);
     
-    chunk = "<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>";
-    chunk += "<span id='update-volume-row' class='rename-row' style='display:none;'>";
-    chunk += "<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='" + String(remainingML) + "'>";
-    chunk += "<button class='rename-btn' onclick='saveUpdateVolume(" + String(channel) + ")'>Save</button>";
-    chunk += "<button class='rename-btn cancel' onclick='cancelUpdateVolume()'>Cancel</button>";
-    chunk += "</span></p>";
-    chunk += "</div>";
+    chunk = F("<span id='update-volume-btn-row'><button style='margin-left:8px;' onclick=\"showUpdateVolumeBox()\">Update Volume</button></span>");
+    chunk += F("<span id='update-volume-row' class='rename-row' style='display:none;'>");
+    chunk += F("<input id='update-volume-input' class='rename-input' type='number' min='0' step='0.01' value='") + String(remainingML) + F("'>");
+    chunk += F("<button class='rename-btn' onclick='saveUpdateVolume(") + String(channel) + F(")'>Save</button>");
+    chunk += F("<button class='rename-btn cancel' onclick='cancelUpdateVolume()'>Cancel</button>");
+    chunk += F("</span></p>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // Schedule Card
-    chunk = "<div class='card'>";
-    chunk += "<h2>Schedule</h2>";
+    chunk = F("<div class='card'>");
+    chunk += F("<h2>Schedule</h2>");
     server.sendContent(chunk);
     
     // Show next dose from weekly schedule
@@ -1008,43 +1007,43 @@ void setupWebServer() {
     }
     
     if (nextDay >= 0) {
-      String ampm = (nextHour < 12) ? "AM" : "PM";
+      String ampm = (nextHour < 12) ? F("AM") : F("PM");
       int hour12 = nextHour % 12 == 0 ? 12 : nextHour % 12;
-      chunk = "<p>Next Dose: " + String(dayNames[nextDay]) + ", " + String(hour12) + ":" + (nextMinute < 10 ? "0" : "") + String(nextMinute) + " " + ampm + "</p>";
-      chunk += "<p>Next Dose Volume: " + String(nextVol) + " ml</p>";
+      chunk = F("<p>Next Dose: ") + String(dayNames[nextDay]) + F(", ") + String(hour12) + F(":") + (nextMinute < 10 ? F("0") : F("")) + String(nextMinute) + F(" ") + ampm + F("</p>");
+      chunk += F("<p>Next Dose Volume: ") + String(nextVol) + F(" ml</p>");
     } else {
-      chunk = "<p>Next Dose: N/A</p>";
-      chunk += "<p>Next Dose Volume: N/A</p>";
+      chunk = F("<p>Next Dose: N/A</p>");
+      chunk += F("<p>Next Dose Volume: N/A</p>");
     }
-    chunk += "<button onclick=\"location.href='/newUI/manageSchedule?channel=" + String(channel) + "'\">Manage Schedule</button>";
-    chunk += "</div>";
+    chunk += F("<button onclick=\"location.href='/newUI/manageSchedule?channel=") + String(channel) + F("'\">Manage Schedule</button>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // Actions Card
-    chunk = "<div class='card'>";
-    chunk += "<button onclick=\"location.href='/prime?channel=" + String(channel) + "'\">Prime Pump</button>";
-    chunk += "<button onclick=\"location.href='/calibrate?channel=" + String(channel) + "'\">Calibrate</button>";
+    chunk = F("<div class='card'>");
+    chunk += F("<button onclick=\"location.href='/prime?channel=") + String(channel) + F("'\">Prime Pump</button>");
+    chunk += F("<button onclick=\"location.href='/calibrate?channel=") + String(channel) + F("'\">Calibrate</button>");
     server.sendContent(chunk);
     
     // Rename UI
-    chunk = "<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>";
-    chunk += "<div id='rename-row' class='rename-row' style='display:none;'>";
-    chunk += "<input id='rename-input' class='rename-input' type='text' value='" + channelName + "'>";
-    chunk += "<button class='rename-btn' onclick='saveRename(" + String(channel) + ")'>Save</button>";
-    chunk += "<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>";
-    chunk += "</div>";
-    chunk += "</div>";
+    chunk = F("<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>");
+    chunk += F("<div id='rename-row' class='rename-row' style='display:none;'>");
+    chunk += F("<input id='rename-input' class='rename-input' type='text' value='") + channelName + F("'>");
+    chunk += F("<button class='rename-btn' onclick='saveRename(") + String(channel) + F(")'>Save</button>");
+    chunk += F("<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>");
+    chunk += F("</div>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // Back and Home buttons row
-    chunk = "<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>";
-    chunk += "<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-    chunk += "</div>";
+    chunk = F("<div style='display:flex;gap:10px;max-width:500px;margin:20px auto 0 auto;'>");
+    chunk += F("<button style='flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
     // Footer
     chunk = generateFooter();
-    chunk += "</body></html>";
+    chunk += F("</body></html>");
     server.sendContent(chunk);
     
     // End chunked response
@@ -1062,9 +1061,9 @@ void setupWebServer() {
         channel2Name = newName;
       }
       savePersistentDataToSPIFFS();
-      server.send(200, "application/json", "{\"status\":\"renamed\"}");
+      server.send(200, "application/json", F("{\"status\":\"renamed\"}"));
     } else {
-      server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+      server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
     }
   });
 
@@ -1079,9 +1078,9 @@ void setupWebServer() {
         remainingMLChannel2 = newVol;
       }
       savePersistentDataToSPIFFS();
-      server.send(200, "application/json", "{\"status\":\"updated\"}");
+      server.send(200, "application/json", F("{\"status\":\"updated\"}"));
     } else {
-      server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+      server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
     }
   });
 
@@ -1094,90 +1093,90 @@ void setupWebServer() {
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "text/html", "");
     // HTML head and style
-    String chunk = "<html><head><title>Manage Schedule: " + ws->channelName + "</title>";
-    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    chunk += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
+    String chunk = F("<html><head><title>Manage Schedule: ") + ws->channelName + F("</title>");
+    chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;}table{width:100%;max-width:500px;margin:20px auto;border-collapse:collapse;}th,td{padding:8px;text-align:center;}th{background:#007BFF;color:#fff;}tr:nth-child(even){background:#f9f9f9;}input[type=number]{width:70px;}input[type=time]{width:120px;}label{margin-left:8px;}button{margin:8px 4px;padding:10px 20px;font-size:1em;border-radius:5px;border:none;background:#007BFF;color:#fff;cursor:pointer;}button.cancel{background:#aaa;}button:disabled,input:disabled{background:#eee;color:#888;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
     server.sendContent(chunk);
     // JS chunk
-    chunk = "<script>\n";
-    chunk += "function copyMondayToOthers() {\n";
-    chunk += "  var enabled=document.getElementById('enabled0').checked;\n";
-    chunk += "  var time=document.getElementById('time0').value;\n";
-    chunk += "  var vol=document.getElementById('vol0').value;\n";
-    chunk += "  for(var i=1;i<7;i++){\n";
-    chunk += "    document.getElementById('enabled'+i).checked=enabled;\n";
-    chunk += "    document.getElementById('time'+i).value=time;\n";
-    chunk += "    document.getElementById('vol'+i).value=vol;\n";
-    chunk += "    document.getElementById('enabled'+i).disabled=true;\n";
-    chunk += "    document.getElementById('time'+i).disabled=true;\n";
-    chunk += "    document.getElementById('vol'+i).disabled=true;\n";
-    chunk += "  }\n";
-    chunk += "}\n";
-    chunk += "function uncopyMonday() {\n";
-    chunk += "  for(var i=1;i<7;i++){\n";
-    chunk += "    document.getElementById('enabled'+i).disabled=false;\n";
-    chunk += "    document.getElementById('time'+i).disabled=false;\n";
-    chunk += "    document.getElementById('vol'+i).disabled=false;\n";
-    chunk += "  }\n";
-    chunk += "}\n";
-    chunk += "function onCopyChange(cb){if(cb.checked){copyMondayToOthers();}else{uncopyMonday();}}\n";
-    chunk += "window.addEventListener('DOMContentLoaded',function(){\n";
-    chunk += "  document.getElementById('enabled0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
-    chunk += "  document.getElementById('time0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
-    chunk += "  document.getElementById('vol0').addEventListener('input',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n";
-    chunk += "});\n";
-    chunk += "</script>\n";
-    chunk += "</head><body>";
+    chunk = F("<script>\n");
+    chunk += F("function copyMondayToOthers() {\n");
+    chunk += F("  var enabled=document.getElementById('enabled0').checked;\n");
+    chunk += F("  var time=document.getElementById('time0').value;\n");
+    chunk += F("  var vol=document.getElementById('vol0').value;\n");
+    chunk += F("  for(var i=1;i<7;i++){\n");
+    chunk += F("    document.getElementById('enabled'+i).checked=enabled;\n");
+    chunk += F("    document.getElementById('time'+i).value=time;\n");
+    chunk += F("    document.getElementById('vol'+i).value=vol;\n");
+    chunk += F("    document.getElementById('enabled'+i).disabled=true;\n");
+    chunk += F("    document.getElementById('time'+i).disabled=true;\n");
+    chunk += F("    document.getElementById('vol'+i).disabled=true;\n");
+    chunk += F("  }\n");
+    chunk += F("}\n");
+    chunk += F("function uncopyMonday() {\n");
+    chunk += F("  for(var i=1;i<7;i++){\n");
+    chunk += F("    document.getElementById('enabled'+i).disabled=false;\n");
+    chunk += F("    document.getElementById('time'+i).disabled=false;\n");
+    chunk += F("    document.getElementById('vol'+i).disabled=false;\n");
+    chunk += F("  }\n");
+    chunk += F("}\n");
+    chunk += F("function onCopyChange(cb){if(cb.checked){copyMondayToOthers();}else{uncopyMonday();}}\n");
+    chunk += F("window.addEventListener('DOMContentLoaded',function(){\n");
+    chunk += F("  document.getElementById('enabled0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n");
+    chunk += F("  document.getElementById('time0').addEventListener('change',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n");
+    chunk += F("  document.getElementById('vol0').addEventListener('input',function(){if(document.getElementById('copyMonday').checked){copyMondayToOthers();}});\n");
+    chunk += F("});\n");
+    chunk += F("</script>\n");
+    chunk += F("</head><body>");
     server.sendContent(chunk);
     // Header and card open
     chunk = generateHeader("Manage Schedule : " + ws->channelName);
-    chunk += "<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>";
-    chunk += "<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=" + String(channel) + "'>";
-    chunk += "<table style='width:100%;border-collapse:collapse;'>";
-    chunk += "<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>";
+    chunk += F("<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>");
+    chunk += F("<form id='scheduleForm' method='POST' action='/newUI/manageSchedule?channel=") + String(channel) + F("'>");
+    chunk += F("<table style='width:100%;border-collapse:collapse;'>");
+    chunk += F("<tr style='background:#007BFF;color:#fff;'><th>Day</th><th>Enabled</th><th>Time</th><th>Volume (ml)</th></tr>");
     server.sendContent(chunk);
     // Table rows chunked
     for (int i = 0; i < 7; ++i) {
-      String rowShade = (i % 2 == 0) ? "background:#f9f9f9;" : "background:#fff;";
-      chunk = "<tr style='" + rowShade + "'>";
-      chunk += "<td>" + String(dayNames[i]) + "</td>";
-      chunk += "<td><input type='checkbox' id='enabled" + String(i) + "' name='enabled" + String(i) + "'" + (ws->days[i].enabled ? " checked" : "") + "></td>";
+      String rowShade = (i % 2 == 0) ? F("background:#f9f9f9;") : F("background:#fff;");
+      chunk = F("<tr style='") + rowShade + F("'>");
+      chunk += F("<td>") + String(dayNames[i]) + F("</td>");
+      chunk += F("<td><input type='checkbox' id='enabled") + String(i) + F("' name='enabled") + String(i) + F("'") + (ws->days[i].enabled ? F(" checked") : F("")) + F("></td>");
       char timebuf[6];
       snprintf(timebuf, sizeof(timebuf), "%02d:%02d", ws->days[i].hour, ws->days[i].minute);
-      chunk += "<td><input type='time' id='time" + String(i) + "' name='time" + String(i) + "' value='" + String(timebuf) + "'></td>";
-      chunk += "<td><input type='number' id='vol" + String(i) + "' name='vol" + String(i) + "' step='0.01' min='0' value='" + String(ws->days[i].volume, 2) + "'></td>";
-      chunk += "</tr>";
+      chunk += F("<td><input type='time' id='time") + String(i) + F("' name='time") + String(i) + F("' value='") + String(timebuf) + F("'></td>");
+      chunk += F("<td><input type='number' id='vol") + String(i) + F("' name='vol") + String(i) + F("' step='0.01' min='0' value='") + String(ws->days[i].volume, 2) + F("'></td>");
+      chunk += F("</tr>");
       server.sendContent(chunk);
     }
     // After table
-    chunk = "</table>";
-    chunk += "<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>";
-    chunk += String("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'") + (ws->missedDoseCompensation ? " checked" : "") + "><label for='missedDose'>Missed Dose Compensation</label></div>";
-    chunk += "<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>";
-    chunk += "<button type='submit' style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;'>Save</button>";
-    chunk += "<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;'>Cancel</button>";
-    chunk += "</div>";
-    chunk += "</form>";
-    chunk += "</div>";
+    chunk = F("</table>");
+    chunk += F("<div style='margin:16px 0 0 0;'><input type='checkbox' id='copyMonday' name='copyMonday' onchange='onCopyChange(this)'><label for='copyMonday' style='margin-left:8px;'>All day as Monday</label></div>");
+    chunk += String(F("<div style='max-width:500px;margin:20px auto;'><input type='checkbox' id='missedDose' name='missedDose'")) + (ws->missedDoseCompensation ? F(" checked") : F("")) + F("><label for='missedDose'>Missed Dose Compensation</label></div>");
+    chunk += F("<div style='display:flex;flex-direction:column;gap:10px;margin-top:20px;'>");
+    chunk += F("<button type='submit' style='width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;'>Save</button>");
+    chunk += F("<button type='button' id='cancelBtn' class='cancel' style='width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;'>Cancel</button>");
+    chunk += F("</div>");
+    chunk += F("</form>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     // Footer and scripts
     chunk = generateFooter();
-    chunk += "<script>\n";
-    chunk += "document.getElementById('scheduleForm').addEventListener('submit',function(e){\n";
-    chunk += "  if(document.getElementById('copyMonday').checked){\n";
-    chunk += "    var enabled=document.getElementById('enabled0').checked;\n";
-    chunk += "    var time=document.getElementById('time0').value;\n";
-    chunk += "    var vol=document.getElementById('vol0').value;\n";
-    chunk += "    for(var i=1;i<7;i++){document.getElementById('enabled'+i).disabled=false;document.getElementById('time'+i).disabled=false;document.getElementById('vol'+i).disabled=false;document.getElementById('enabled'+i).checked=enabled;document.getElementById('time'+i).value=time;document.getElementById('vol'+i).value=vol;}\n";
-    chunk += "  }\n";
-    chunk += "});\n";
-    chunk += "document.getElementById('cancelBtn').addEventListener('click',function(){\n";
-    chunk += "  var url = new URL(window.location.href);\n";
-    chunk += "  var channel = url.searchParams.get('channel') || '1';\n";
-    chunk += "  window.location.href = '/newUI/manageChannel?channel=' + channel;\n";
-    chunk += "});\n";
-    chunk += "</script>\n";
-    chunk += "</form></body></html>";
+    chunk += F("<script>\n");
+    chunk += F("document.getElementById('scheduleForm').addEventListener('submit',function(e){\n");
+    chunk += F("  if(document.getElementById('copyMonday').checked){\n");
+    chunk += F("    var enabled=document.getElementById('enabled0').checked;\n");
+    chunk += F("    var time=document.getElementById('time0').value;\n");
+    chunk += F("    var vol=document.getElementById('vol0').value;\n");
+    chunk += F("    for(var i=1;i<7;i++){document.getElementById('enabled'+i).disabled=false;document.getElementById('time'+i).disabled=false;document.getElementById('vol'+i).disabled=false;document.getElementById('enabled'+i).checked=enabled;document.getElementById('time'+i).value=time;document.getElementById('vol'+i).value=vol;}\n");
+    chunk += F("  }\n");
+    chunk += F("});\n");
+    chunk += F("document.getElementById('cancelBtn').addEventListener('click',function(){\n");
+    chunk += F("  var url = new URL(window.location.href);\n");
+    chunk += F("  var channel = url.searchParams.get('channel') || '1';\n");
+    chunk += F("  window.location.href = '/newUI/manageChannel?channel=' + channel;\n");
+    chunk += F("});\n");
+    chunk += F("</script>\n");
+    chunk += F("</form></body></html>");
     server.sendContent(chunk);
     // End chunked response
     server.sendContent("");
@@ -1222,31 +1221,31 @@ void setupWebServer() {
     server.send(200, "text/html", "");
     
     // HTML head
-    String chunk = "<html><head><title>System Settings</title>";
-    chunk += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-    chunk += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ";
+    String chunk = F("<html><head><title>System Settings</title>");
+    chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    chunk += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} ");
     server.sendContent(chunk);
     
     // CSS in chunks
-    chunk = ".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ";
-    chunk += ".card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} ";
-    chunk += "label{display:block;margin-bottom:6px;font-weight:500;} ";
+    chunk = F(".card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} ");
+    chunk += F(".card h2{margin-top:0;color:#007BFF;} .form-row{margin-bottom:16px;} ");
+    chunk += F("label{display:block;margin-bottom:6px;font-weight:500;} ");
     server.sendContent(chunk);
     
-    chunk = "input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} ";
-    chunk += ".section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} ";
+    chunk = F("input[type=text],input[type=number],input[type=password],select{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;} ");
+    chunk += F(".section-title{font-size:1.1em;font-weight:600;margin:18px 0 8px 0;color:#007BFF;} ");
     server.sendContent(chunk);
     
-    chunk = ".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} ";
-    chunk += ".btn-row{display:flex;gap:10px;margin-top:18px;} ";
-    chunk += ".btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} ";
+    chunk = F(".checkbox-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;} ");
+    chunk += F(".btn-row{display:flex;gap:10px;margin-top:18px;} ");
+    chunk += F(".btn{flex:1;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background 0.2s;} ");
     server.sendContent(chunk);
     
-    chunk = ".btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} ";
-    chunk += ".btn:hover{background:#0056b3;} .btn.cancel:hover{background:#888;} .btn.danger:hover{background:#b30000;} .btn.update:hover{background:#218838;} ";
+    chunk = F(".btn.cancel{background:#aaa;} .btn.danger{background:#dc3545;} .btn.update{background:#28a745;} ");
+    chunk += F(".btn:hover{background:#0056b3;} .btn.cancel:hover{background:#888;} .btn.danger:hover{background:#b30000;} .btn.update:hover{background:#218838;} ");
     server.sendContent(chunk);
     
-    chunk = "</style></head><body>";
+    chunk = F("</style></head><body>");
     server.sendContent(chunk);
     
     // Header
@@ -1254,170 +1253,167 @@ void setupWebServer() {
     server.sendContent(chunk);
     
     // Form start and device settings
-    chunk = "<form method='POST' action='/newUI/systemSettings'>";
-    chunk += "<div class='card'>";
-    chunk += "<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='" + deviceName + "'></div>";
+    chunk = F("<form method='POST' action='/newUI/systemSettings'>");
+    chunk += F("<div class='card'>");
+    chunk += F("<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='") + deviceName + F("'></div>");
     server.sendContent(chunk);
 
     // Timezone dropdown
-    chunk = "<div class='form-row'><label for='timezone'>Time Zone:</label><select name='timezone'>";
+    chunk = F("<div class='form-row'><label for='timezone'>Time Zone:</label><select name='timezone'>");
     int tzOffsets[] = {-43200,-39600,-36000,-32400,-28800,-25200,-21600,-18000,-14400,-10800,-7200,-3600,0,3600,7200,10800,14400,18000,19800,21600,25200,28800,32400,36000,39600,43200};
     String tzLabels[] = {"UTC-12:00","UTC-11:00","UTC-10:00","UTC-09:00","UTC-08:00 (PST)","UTC-07:00 (MST)","UTC-06:00 (CST)","UTC-05:00 (EST)","UTC-04:00","UTC-03:00","UTC-02:00","UTC-01:00","UTC+00:00","UTC+01:00","UTC+02:00","UTC+03:00","UTC+04:00","UTC+05:00","UTC+05:30 (IST)","UTC+06:00","UTC+07:00","UTC+08:00","UTC+09:00 (JST)","UTC+10:00","UTC+11:00","UTC+12:00"};
     server.sendContent(chunk);
     
     // Send timezone options in smaller chunks
     for (int i = 0; i < 26; i += 5) {
-      chunk = "";
+      chunk = F("");
       for (int j = i; j < i + 5 && j < 26; j++) {
-        chunk += "<option value='" + String(tzOffsets[j]) + "'" + (timezoneOffset == tzOffsets[j] ? " selected" : "") + ">" + tzLabels[j] + "</option>";
+        chunk += F("<option value='") + String(tzOffsets[j]) + F("'") + (timezoneOffset == tzOffsets[j] ? F(" selected") : F("")) + F(">") + tzLabels[j] + F("</option>");
       }
       server.sendContent(chunk);
     }
     
-    chunk = "</select></div>";
-    chunk += "<div class='section-title'>Calibration Factor</div>";
-    chunk += "<div class='form-row'>Channel 1: <span style='font-weight:600;'>" + String(calib1, 2) + "</span></div>";
-    chunk += "<div class='form-row'>Channel 2: <span style='font-weight:600;'>" + String(calib2, 2) + "</span></div>";
+    chunk = F("</select></div>");
+    chunk += F("<div class='section-title'>Calibration Factor</div>");
+    chunk += F("<div class='form-row'>Channel 1: <span style='font-weight:600;'>") + String(calib1, 2) + F("</span></div>");
+    chunk += F("<div class='form-row'>Channel 2: <span style='font-weight:600;'>") + String(calib2, 2) + F("</span></div>");
     server.sendContent(chunk);
     
     // Notifications section
-    chunk = "<div class='section-title'>Notifications</div>";
+    chunk = F("<div class='section-title'>Notifications</div>");
     // NTFY Channel as read-only, default to MAC if empty
     String ntfyDefault = mac;
-    chunk += "<div class='form-row'><label for='ntfyChannel'>NTFY Channel:</label><input type='text' id='ntfyChannel' name='ntfyChannel' value='" + ntfyDefault + "' readonly></div>";
-    chunk += "<div class='form-row'>Events to Notify:</div>";
+    chunk += F("<div class='form-row'><label for='ntfyChannel'>NTFY Channel:</label><input type='text' id='ntfyChannel' name='ntfyChannel' value='") + ntfyDefault + F("' readonly></div>");
+    chunk += F("<div class='form-row'>Events to Notify:</div>");
     server.sendContent(chunk);
     
-    chunk = "<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert'" + String(notifyLowFert ? " checked" : "") + "><label for='notifyLowFert'>Low Fertilizer Volume</label></div>";
-    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart'" + String(notifyStart ? " checked" : "") + "><label for='notifyStart'>System Start</label></div>";
-    chunk += "<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose'" + String(notifyDose ? " checked" : "") + "><label for='notifyDose'>Dose</label></div>";
+    chunk = F("<div class='checkbox-row'><input type='checkbox' id='notifyLowFert' name='notifyLowFert'") + String(notifyLowFert ? F(" checked") : F("")) + F("><label for='notifyLowFert'>Low Fertilizer Volume</label></div>");
+    chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart'") + String(notifyStart ? F(" checked") : F("")) + F("><label for='notifyStart'>System Start</label></div>");
+    chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose'") + String(notifyDose ? F(" checked") : F("")) + F("><label for='notifyDose'>Dose</label></div>");
     server.sendContent(chunk);
     
     // Buttons
-    chunk = "<div class='btn-row'>";
-    chunk += "<button type='submit' class='btn btn-main'>Save</button>";
-    chunk += "<button type='button' class='btn btn-cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button>";
-    chunk += "</div></div></form>"; // Close main form and card
+    chunk = F("<div class='btn-row'>");
+    chunk += F("<button type='submit' class='btn btn-main'>Save</button>");
+    chunk += F("<button type='button' class='btn btn-cancel' onclick=\"window.location.href='/newUI/summary'\">Cancel</button>");
+    chunk += F("</div></div></form>"); // Close main form and card
     server.sendContent(chunk);
 
     // Action buttons outside the main form
     // Each button spans the full width of the card, one per row, with reduced vertical spacing
-    chunk = "<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>";
-    // Restart button with JS handler
-    chunk += "<form id='restartForm' style='width:100%;'><button type='button' id='restartBtn' class='btn btn-main' style='width:100%;margin-bottom:0;' onclick=\"handleRestartClick()\">Restart</button></form>";
-    chunk += "<form method='POST' action='/wifiReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>";
-    chunk += "<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>";
-    chunk += "<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>";
-    chunk += "</div>";
-    // JS for restart logic
-    chunk += "<script>\nfunction handleRestartClick() {\n  var btn = document.getElementById('restartBtn');\n  btn.textContent = 'Device restarting... Please wait.';\n  btn.disabled = true;\n  fetch('/restart', { method: 'POST' });\n  setTimeout(function() { window.location.href = '/newUI/summary'; }, 10000);\n}\n</script>";
+    chunk = F("<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>");
+    chunk += F("<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>");
+    chunk += F("<form method='POST' action='/restart' style='width:100%;'><button type='submit' class='btn btn-main' style='width:100%;margin-bottom:0;'>Restart</button></form>");
+    chunk += F("<form method='POST' action='/wifiReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>");
+    chunk += F("<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>");
+    chunk += F("</div>");
     server.sendContent(chunk);
 
     // Update CSS for button consistency and centering
-    chunk = "<style> ";
-    chunk += ".btn-row.card-action-row { display: flex; justify-content: center; align-items: center; gap: 10px; max-width: 500px; margin: 0 auto 16px auto; } ";
-    chunk += ".btn-row.card-action-row .btn { flex: unset; min-width: 120px; } ";
-    chunk += ".btn { padding:12px 0; font-size:1.1em; border:none; border-radius:6px; cursor:pointer; transition:background 0.2s; min-width:120px; margin:0 4px 8px 0; } ";
-    chunk += ".btn-main { background:#007BFF; color:#fff; } ";
-    chunk += ".btn-cancel { background:#aaa; color:#fff; } ";
-    chunk += ".btn-danger { background:#dc3545; color:#fff; } ";
-    chunk += ".btn-update { background:#28a745; color:#fff; } ";
-    chunk += ".btn-main:hover { background:#0056b3; } ";
-    chunk += ".btn-cancel:hover { background:#888; } ";
-    chunk += ".btn-danger:hover { background:#b30000; } ";
-    chunk += ".btn-update:hover { background:#218838; } ";
-    chunk += "</style>";
+    chunk = F("<style> ");
+    chunk += F(".btn-row.card-action-row { display: flex; justify-content: center; align-items: center; gap: 10px; max-width: 500px; margin: 0 auto 16px auto; } ");
+    chunk += F(".btn-row.card-action-row .btn { flex: unset; min-width: 120px; } ");
+    chunk += F(".btn { padding:12px 0; font-size:1.1em; border:none; border-radius:6px; cursor:pointer; transition:background 0.2s; min-width:120px; margin:0 4px 8px 0; } ");
+    chunk += F(".btn-main { background:#007BFF; color:#fff; } ");
+    chunk += F(".btn-cancel { background:#aaa; color:#fff; } ");
+    chunk += F(".btn-danger { background:#dc3545; color:#fff; } ");
+    chunk += F(".btn-update { background:#28a745; color:#fff; } ");
+    chunk += F(".btn-main:hover { background:#0056b3; } ");
+    chunk += F(".btn-cancel:hover { background:#888; } ");
+    chunk += F(".btn-danger:hover { background:#b30000; } ");
+    chunk += F(".btn-update:hover { background:#218838; } ");
+    chunk += F("</style>");
     server.sendContent(chunk);
 
     // Firmware update section
-    chunk = "<div id='firmwareUpdateSection' style='display:none;margin-top:20px;'>";
-    chunk += "<div class='card'>";
-    chunk += "<h3>FW Update</h3>";
-    chunk += "<div class='form-row'><label for='firmwareUrl'>Firmware URL:</label>";
-    chunk += "<input type='text' id='firmwareUrl' value='ABC.com/fw.bin' style='width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;'></div>";
+    chunk = F("<div id='firmwareUpdateSection' style='display:none;margin-top:20px;'>");
+    chunk += F("<div class='card'>");
+    chunk += F("<h3>FW Update</h3>");
+    chunk += F("<div class='form-row'><label for='firmwareUrl'>Firmware URL:</label>");
+    chunk += F("<input type='text' id='firmwareUrl' value='ABC.com/fw.bin' style='width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;'></div>");
     server.sendContent(chunk);
     
-    chunk = "<div class='btn-row'>";
-    chunk += "<button type='button' class='btn btn-update' onclick=\"updateFirmware()\">Update</button>";
-    chunk += "<button type='button' class='btn btn-cancel' onclick=\"hideFirmwareUpdate()\">Cancel</button>";
-    chunk += "</div>";
+    chunk += F("<div class='btn-row'>");
+    chunk += F("<button type='button' class='btn btn-update' onclick=\"updateFirmware()\">Update</button>");
+    chunk += F("<button type='button' class='btn btn-cancel' onclick=\"hideFirmwareUpdate()\">Cancel</button>");
+    chunk += F("</div>");
     server.sendContent(chunk);
     
-    chunk = "<div id='updateProgress' style='margin-top:10px;display:none;'>";
-    chunk += "<div>Downloading firmware...</div>";
-    chunk += "<div id='progressBar' style='width:100%;background:#ddd;border-radius:6px;margin-top:5px;'>";
-    chunk += "<div id='progressFill' style='width:0%;height:20px;background:#007BFF;border-radius:6px;transition:width 0.3s;'></div>";
-    chunk += "</div><div id='progressText'>0%</div></div></div></div>";
+    chunk += F("<div id='updateProgress' style='margin-top:10px;display:none;'>");
+    chunk += F("<div>Downloading firmware...</div>");
+    chunk += F("<div id='progressBar' style='width:100%;background:#ddd;border-radius:6px;margin-top:5px;'>");
+    chunk += F("<div id='progressFill' style='width:0%;height:20px;background:#007BFF;border-radius:6px;transition:width 0.3s;'></div>");
+    chunk += F("</div><div id='progressText'>0%</div></div></div></div>");
     server.sendContent(chunk);
     
     // JavaScript in smaller chunks
-    chunk = "<script>";
-    chunk += "function showFirmwareUpdate() {";
-    chunk += "  document.getElementById('firmwareUpdateSection').style.display = 'block';";
-    chunk += "}";
-    chunk += "function hideFirmwareUpdate() {";
-    chunk += "  document.getElementById('firmwareUpdateSection').style.display = 'none';";
-    chunk += "  document.getElementById('updateProgress').style.display = 'none';";
-    chunk += "}";
+    chunk = F("<script>");
+    chunk += F("function showFirmwareUpdate() {");
+    chunk += F("  document.getElementById('firmwareUpdateSection').style.display = 'block';");
+    chunk += F("}");
+    chunk += F("function hideFirmwareUpdate() {");
+    chunk += F("  document.getElementById('firmwareUpdateSection').style.display = 'none';");
+    chunk += F("  document.getElementById('updateProgress').style.display = 'none';");
+    chunk += F("}");
     server.sendContent(chunk);
     
-    chunk = "async function updateFirmware() {";
-    chunk += "  const url = document.getElementById('firmwareUrl').value;";
-    chunk += "  if (!url) { alert('Please enter firmware URL'); return; }";
-    chunk += "  document.getElementById('updateProgress').style.display = 'block';";
-    chunk += "  const progressFill = document.getElementById('progressFill');";
-    chunk += "  const progressText = document.getElementById('progressText');";
+    chunk += F("async function updateFirmware() {");
+    chunk += F("  const url = document.getElementById('firmwareUrl').value;");
+    chunk += F("  if (!url) { alert('Please enter firmware URL'); return; }");
+    chunk += F("  document.getElementById('updateProgress').style.display = 'block';");
+    chunk += F("  const progressFill = document.getElementById('progressFill');");
+    chunk += F("  const progressText = document.getElementById('progressText');");
     server.sendContent(chunk);
     
-    chunk = "  try {";
-    chunk += "    const response = await fetch(url);";
-    chunk += "    if (!response.ok) throw new Error('Failed to download firmware');";
-    chunk += "    const contentLength = response.headers.get('content-length');";
-    chunk += "    const total = parseInt(contentLength, 10);";
-    chunk += "    let loaded = 0; const reader = response.body.getReader(); const chunks = [];";
+    chunk += F("  try {");
+    chunk += F("    const response = await fetch(url);");
+    chunk += F("    if (!response.ok) throw new Error('Failed to download firmware');");
+    chunk += F("    const contentLength = response.headers.get('content-length');");
+    chunk += F("    const total = parseInt(contentLength, 10);");
+    chunk += F("    let loaded = 0; const reader = response.body.getReader(); const chunks = [];");
     server.sendContent(chunk);
     
-    chunk = "    while (true) {";
-    chunk += "      const { done, value } = await reader.read();";
-    chunk += "      if (done) break;";
-    chunk += "      chunks.push(value); loaded += value.length;";
-    chunk += "      if (total) {";
-    chunk += "        const progress = (loaded / total) * 100;";
-    chunk += "        progressFill.style.width = progress + '%';";
-    chunk += "        progressText.textContent = Math.round(progress) + '%';";
-    chunk += "      }}";
+    chunk += F("    while (true) {");
+    chunk += F("      const { done, value } = await reader.read();");
+    chunk += F("      if (done) break;");
+    chunk += F("      chunks.push(value); loaded += value.length;");
+    chunk += F("      if (total) {");
+    chunk += F("        const progress = (loaded / total) * 100;");
+    chunk += F("        progressFill.style.width = progress + '%';");
+    chunk += F("        progressText.textContent = Math.round(progress) + '%';");
+    chunk += F("      }}");
     server.sendContent(chunk);
     
-    chunk = "    const firmwareData = new Uint8Array(loaded);";
-    chunk += "    let offset = 0;";
-    chunk += "    for (const chunk of chunks) {";
-    chunk += "      firmwareData.set(chunk, offset); offset += chunk.length;";
-    chunk += "    }";
-    chunk += "    progressText.textContent = 'Flashing firmware...';";
-    chunk += "    const formData = new FormData();";
-    chunk += "    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');";
+    chunk += F("    const firmwareData = new Uint8Array(loaded);");
+    chunk += F("    let offset = 0;");
+    chunk += F("    for (const chunk of chunks) {");
+    chunk += F("      firmwareData.set(chunk, offset); offset += chunk.length;");
+    chunk += F("    }");
+    chunk += F("    progressText.textContent = 'Flashing firmware...';");
+    chunk += F("    const formData = new FormData();");
+    chunk += F("    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');");
     server.sendContent(chunk);
     
-    chunk = "    const uploadResponse = await fetch('/update', {";
-    chunk += "      method: 'POST', body: formData";
-    chunk += "    });";
-    chunk += "    if (uploadResponse.ok) {";
-    chunk += "      progressText.textContent = 'Firmware updated successfully! Device will restart...';";
-    chunk += "      setTimeout(() => { window.location.href = '/newUI/summary'; }, 3000);";
-    chunk += "    } else { throw new Error('Failed to flash firmware'); }";
+    chunk += F("    const uploadResponse = await fetch('/update', {");
+    chunk += F("      method: 'POST', body: formData");
+    chunk += F("    });");
+    chunk += F("    if (uploadResponse.ok) {");
+    chunk += F("      progressText.textContent = 'Firmware updated successfully! Device will restart...';");
+    chunk += F("      setTimeout(() => { window.location.href = '/newUI/summary'; }, 3000);");
+    chunk += F("    } else { throw new Error('Failed to flash firmware'); }");
     server.sendContent(chunk);
     
-    chunk = "  } catch (error) {";
-    chunk += "    alert('Firmware update failed: ' + error.message);";
-    chunk += "    hideFirmwareUpdate();";
-    chunk += "  }";
-    chunk += "}";
-    chunk += "</script>";
+    chunk += F("  } catch (error) {");
+    chunk += F("    alert('Firmware update failed: ' + error.message);");
+    chunk += F("    hideFirmwareUpdate();");
+    chunk += F("  }");
+    chunk += F("}");
+    chunk += F("</script>");
     server.sendContent(chunk);
     
     // Footer
     chunk = generateFooter();
-    chunk += "</body></html>";
+    chunk += F("</body></html>");
     server.sendContent(chunk);
     
     // End chunked response
@@ -1443,13 +1439,13 @@ void handleCalibration() {
       calibrationFactor = 15000.0 / dispensedML;
       savePersistentDataToSPIFFS();
       // Show toast and redirect to channel management
-      String html = "<html><head><meta http-equiv='refresh' content='2;url=/newUI/manageChannel?channel=" + String(channel) + "'>";
-      html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-      html += "<style>.toast{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#28a745;color:#fff;padding:18px 32px;border-radius:8px;font-size:1.2em;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:9999;}</style>";
-      html += "</head><body>";
-      html += "<div class='toast'>Calibration complete!</div>";
-      html += "<script>setTimeout(function(){window.location.href='/newUI/manageChannel?channel=" + String(channel) + "';},1800);</script>";
-      html += "</body></html>";
+      String html = F("<html><head><meta http-equiv='refresh' content='2;url=/newUI/manageChannel?channel=") + String(channel) + F("'>");
+      html += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+      html += F("<style>.toast{position:fixed;top:30px;left:50%;transform:translateX(-50%);background:#28a745;color:#fff;padding:18px 32px;border-radius:8px;font-size:1.2em;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:9999;}</style>");
+      html += F("</head><body>");
+      html += F("<div class='toast'>Calibration complete!</div>");
+      html += F("<script>setTimeout(function(){window.location.href='/newUI/manageChannel?channel=") + String(channel) + F("';},1800);</script>");
+      html += F("</body></html>");
       server.send(200, "text/html", html);
       return;
     }
@@ -1460,31 +1456,31 @@ void handleCalibration() {
       runMotor(channel, 15000);
       
       // Show form to input dispensed amount
-      String html = "";
-      html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-      html += "<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-label{font-size:1.1em;margin-bottom:8px;display:block;} .calib-input{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;margin-bottom:16px;} .calib-submit{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>";
-      html += "</head><body>";
+      String html = F("");
+      html += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+      html += F("<style>body{font-family:Arial,sans-serif;background:#f4f4f9;color:#333;} .card{margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);} .card h2{margin-top:0;color:#007BFF;} .calib-label{font-size:1.1em;margin-bottom:8px;display:block;} .calib-input{width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;margin-bottom:16px;} .calib-submit{width:100%;padding:14px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;cursor:pointer;} .home-btn{width:100%;padding:12px 0;font-size:1.1em;background:#007BFF;color:#fff;border:none;border-radius:6px;} .back-btn{width:100%;padding:12px 0;font-size:1.1em;background:#aaa;color:#fff;border:none;border-radius:6px;margin-top:10px;} .card button, .card-btn, .dispense-btn, .calib-btn, .prime-btn, .home-btn, .back-btn, .rename-btn, button.cancel { transition: background 0.2s; } .card button:hover, .card-btn:hover, .dispense-btn:hover, .calib-btn:hover, .prime-btn:hover, .home-btn:hover, .rename-btn:hover { background-color: #0056b3 !important; } .prime-btn.stop:hover { background-color: #218838 !important; } .rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
+      html += F("</head><body>");
       html += generateHeader("Calibration Measurement");
-      html += "<div class='card'>";
+      html += F("<div class='card'>");
      // html += "<h2>Calibration Measurement</h2>";
-      html += "<p style='margin-bottom:18px;'>Motor has run for 15 seconds. Please measure the dispensed liquid and enter the amount below:</p>";
-      html += "<form action='/calibrate' method='POST'>";
-      html += "<input type='hidden' name='channel' value='" + String(channel) + "'>";
-      html += "<label for='dispensedML' class='calib-label'>Amount dispensed (ml):</label>";
-      html += "<input type='number' name='dispensedML' step='0.1' required class='calib-input'><br>";
-      html += "<button type='submit' class='calib-submit'>Submit Measurement</button>";
-      html += "</form>";
-      html += "<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>";
-      html += "<button class='back-btn' onclick=\"history.back()\">Back</button>";
-      html += "</div>";
+      html += F("<p style='margin-bottom:18px;'>Motor has run for 15 seconds. Please measure the dispensed liquid and enter the amount below:</p>");
+      html += F("<form action='/calibrate' method='POST'>");
+      html += F("<input type='hidden' name='channel' value='") + String(channel) + F("'>");
+      html += F("<label for='dispensedML' class='calib-label'>Amount dispensed (ml):</label>");
+      html += F("<input type='number' name='dispensedML' step='0.1' required class='calib-input'><br>");
+      html += F("<button type='submit' class='calib-submit'>Submit Measurement</button>");
+      html += F("</form>");
+      html += F("<button class='home-btn' onclick=\"window.location.href='/newUI/summary'\">Home</button>");
+      html += F("<button class='back-btn' onclick=\"history.back()\">Back</button>");
+      html += F("</div>");
       html += generateFooter();
-      html += "</body></html>";
+      html += F("</body></html>");
       server.send(200, "text/html", html);
       return;
     }
   }
   
-  server.send(400, "application/json", "{\"error\":\"missing or invalid parameters\"}");
+  server.send(400, "application/json", F("{\"error\":\"missing or invalid parameters\"}"));
 }
 
 
@@ -1509,16 +1505,16 @@ void handleManualDispense() {
     if (channel == 1) {
       lastDispensedVolume1 = ml;
       lastDispensedTime1 = getFormattedTime();
-      Serial.print("[MANUAL DOSE] lastDispensedVolume1 set: "); Serial.println(lastDispensedVolume1);
-      Serial.print("[MANUAL DOSE] lastDispensedTime1 set: "); Serial.println(lastDispensedTime1);
+      Serial.print(F("[MANUAL DOSE] lastDispensedVolume1 set: ")); Serial.println(lastDispensedVolume1);
+      Serial.print(F("[MANUAL DOSE] lastDispensedTime1 set: ")); Serial.println(lastDispensedTime1);
     } else if (channel == 2) {
       lastDispensedVolume2 = ml;
       lastDispensedTime2 = getFormattedTime();
-      Serial.print("[MANUAL DOSE] lastDispensedVolume2 set: "); Serial.println(lastDispensedVolume2);
-      Serial.print("[MANUAL DOSE] lastDispensedTime2 set: "); Serial.println(lastDispensedTime2);
+      Serial.print(F("[MANUAL DOSE] lastDispensedVolume2 set: ")); Serial.println(lastDispensedVolume2);
+      Serial.print(F("[MANUAL DOSE] lastDispensedTime2 set: ")); Serial.println(lastDispensedTime2);
     }
     savePersistentDataToSPIFFS();
-    Serial.println("[MANUAL DOSE] savePersistentDataToSPIFFS called");
+    Serial.println(F("[MANUAL DOSE] savePersistentDataToSPIFFS called"));
 
     // After dosing, send notifications if enabled
     // Use global notification variables instead of reading from form arguments
@@ -1535,9 +1531,9 @@ void handleManualDispense() {
       sendNtfyNotification("Low Fertilizer Alert", msg);
     }
 
-    server.send(200, "application/json", "{\"status\":\"dispensed\"}");
+    server.send(200, "application/json", F("{\"status\":\"dispensed\"}"));
   } else {
-    server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+    server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
   }
 }
 
@@ -1551,9 +1547,9 @@ void handleDailyDispense() {
     // Save the updated schedule
     savePersistentDataToSPIFFS();
 
-    server.send(200, "application/json", "{\"status\":\"schedule set\"}");
+    server.send(200, "application/json", F("{\"status\":\"schedule set\"}"));
   } else {
-    server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+    server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
   }
 }
 
@@ -1577,10 +1573,10 @@ void checkDailyDispense() {
    
     lastDispensedVolume1 = 0;
     lastDispensedTime1 = getFormattedTime();
-    Serial.print("[SCHEDULED DOSE] lastDispensedVolume1 set: "); Serial.println(lastDispensedVolume1);
-    Serial.print("[SCHEDULED DOSE] lastDispensedTime1 set: "); Serial.println(lastDispensedTime1);
+    Serial.print(F("[SCHEDULED DOSE] lastDispensedVolume1 set: ")); Serial.println(lastDispensedVolume1);
+    Serial.print(F("[SCHEDULED DOSE] lastDispensedTime1 set: ")); Serial.println(lastDispensedTime1);
     savePersistentDataToSPIFFS();
-    Serial.println("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 1");
+    Serial.println(F("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 1"));
   }
   
   // Run channel 2 if needed
@@ -1589,17 +1585,17 @@ void checkDailyDispense() {
    
     lastDispensedVolume2 = 0;
     lastDispensedTime2 = getFormattedTime();
-    Serial.print("[SCHEDULED DOSE] lastDispensedVolume2 set: "); Serial.println(lastDispensedVolume2);
-    Serial.print("[SCHEDULED DOSE] lastDispensedTime2 set: "); Serial.println(lastDispensedTime2);
+    Serial.print(F("[SCHEDULED DOSE] lastDispensedVolume2 set: ")); Serial.println(lastDispensedVolume2);
+    Serial.print(F("[SCHEDULED DOSE] lastDispensedTime2 set: ")); Serial.println(lastDispensedTime2);
     savePersistentDataToSPIFFS();
-    Serial.println("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 2");
+    Serial.println(F("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 2"));
   }
 }
 
 void setupTimeSync() {
   timeClient.begin();
   timeClient.setTimeOffset(timezoneOffset);
-  Serial.println("Syncing time...");
+  Serial.println(F("Syncing time..."));
   
   int retries = 0;
   while (!timeClient.update() && retries < 10) {
@@ -1609,12 +1605,12 @@ void setupTimeSync() {
   }
   
   if (retries >= 10) {
-    Serial.println("Time sync failed!");
+    Serial.println(F("Time sync failed!"));
   } else {
     //set global flag
     timeSynced = true;
-    Serial.println("Time synced successfully");
-    Serial.println("Current time: " + getFormattedTime());
+    Serial.println(F("Time synced successfully"));
+    Serial.println(F("Current time: ") + getFormattedTime());
   }
 }
 
@@ -1624,14 +1620,14 @@ void setupTimeSync() {
 void loadPersistentDataFromSPIFFS() {
   File file = LittleFS.open("/data.json", "r");
   if (!file) {
-    Serial.println("Failed to open file for reading");
+    Serial.println(F("Failed to open file for reading"));
     return;
   }
 
   DynamicJsonDocument doc(JSON_BUFFER_SIZE);
   DeserializationError error = deserializeJson(doc, file);
   if (error) {
-    Serial.println("Failed to parse JSON");
+    Serial.println(F("Failed to parse JSON"));
     return;
   }
 
@@ -1663,14 +1659,14 @@ void loadPersistentDataFromSPIFFS() {
   notifyDose = doc["notifyDose"] | false;
 
   file.close();
-  Serial.println("Loaded configuration from filesystem");
+  Serial.println(F("Loaded configuration from filesystem"));
 }
 
 // JSON handling functions updated to use JsonDocument
 void savePersistentDataToSPIFFS() {
   File file = LittleFS.open("/data.json", "w");
   if (!file) {
-    Serial.println("Failed to open file for writing");
+    Serial.println(F("Failed to open file for writing"));
     return;
   }
 
@@ -1704,11 +1700,11 @@ void savePersistentDataToSPIFFS() {
   doc["notifyDose"] = notifyDose;
 
   if (serializeJson(doc, file) == 0) {
-    Serial.println("Failed to write JSON to file");
+    Serial.println(F("Failed to write JSON to file"));
   }
 
   file.close();
-  Serial.println("Saved configuration to filesystem");
+  Serial.println(F("Saved configuration to filesystem"));
 }
 
 void handleBottleTracking() {
@@ -1723,9 +1719,9 @@ void handleBottleTracking() {
     }
 
     savePersistentDataToSPIFFS();
-    server.send(200, "application/json", "{\"status\":\"bottle updated\"}");
+    server.send(200, "application/json", F("{\"status\":\"bottle updated\"}"));
   } else {
-    server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+    server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
   }
 }
 
@@ -1757,11 +1753,11 @@ void setupOTA() {
       type = "filesystem";
     }
     // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-    Serial.println("Start updating " + type);
+    Serial.println(F("Start updating ") + type);
   });
 
   ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
+    Serial.println(F("\nEnd"));
   });
 
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -1771,20 +1767,20 @@ void setupOTA() {
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
+      Serial.println(F("Auth Failed"));
     } else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
+      Serial.println(F("Begin Failed"));
     } else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
+      Serial.println(F("Connect Failed"));
     } else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
+      Serial.println(F("Receive Failed"));
     } else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
+      Serial.println(F("End Failed"));
     }
   });
 
   ArduinoOTA.begin();
-  Serial.println("OTA Ready");
+  Serial.println(F("OTA Ready"));
 }
 
 void blinkLED(uint32_t color, int times) {
@@ -1893,32 +1889,32 @@ void handlePrimePump() {
       isPrimingChannel2 = state;
     }
     
-    String msg = String("{\"status\":\"prime pump ") + (state ? "started" : "stopped") + "\"}";
+    String msg = String(F("{\"status\":\"prime pump ")) + (state ? F("started") : F("stopped")) + F("\"}");
     server.send(200, "application/json", msg);
   } else {
-    server.send(400, "application/json", "{\"error\":\"missing parameters\"}");
+    server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
   }
 }
 
 // Common header and footer generators
-String generateHeader(String title) {
-  String html = "<div style='width:100%;background:#007BFF;color:#fff;padding:16px 0;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);margin-bottom:10px;'>";
+String generateHeader(const String& title) {
+  String html = F("<div style='width:100%;background:#007BFF;color:#fff;padding:16px 0;text-align:center;font-size:1.5em;border-radius:10px 10px 0 0;box-shadow:0 2px 4px rgba(0,0,0,0.05);margin-bottom:10px;'>");
   html += title;
-  html += "</div>";
+  html += F("</div>");
   return html;
 }
 
 String generateFooter() {
-  String html = "<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>";
-  html += "S/W version : 1.0  Support : mymail.arjun@gmail.com";
-  html += "<br>Available RAM: " + String(ESP.getFreeHeap() / 1024.0, 2) + " KB";
-  html += "</div>";
+  String html = F("<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>");
+  html += F("S/W version : 1.0  Support : mymail.arjun@gmail.com");
+  html += F("<br>Available RAM: ") + String(ESP.getFreeHeap() / 1024.0, 2) + F(" KB");
+  html += F("</div>");
   return html;
 }
 
 void handleRestartOnly() {
   
- Serial.println("Restarting system...");
+ Serial.println(F("Restarting system..."));
 
   // Give browser time to receive response, then restart
   delay(500);
@@ -1992,12 +1988,12 @@ void handleSystemSettingsSave() {
 void sendNtfyNotification(const String& title, const String& message) {
   String mac = WiFi.macAddress();
   mac.replace(":", "");
-  String ntfyUrl = "http://ntfy.sh/" + mac;
-  Serial.println("Sending NTFY notification to: " + ntfyUrl);
+  String ntfyUrl = F("http://ntfy.sh/") + mac;
+  Serial.println(F("Sending NTFY notification to: ") + ntfyUrl);
   WiFiClient wifiClient;
   HTTPClient http;
   http.begin(wifiClient, ntfyUrl);
-  http.addHeader("Title", title);
+  http.addHeader(F("Title"), title);
   http.POST(message);
   http.end();
 }
