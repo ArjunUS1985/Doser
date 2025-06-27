@@ -9,7 +9,7 @@
 #include <WiFiManager.h>
 #include <Adafruit_NeoPixel.h>
 #include <LittleFS.h>
-#include <ESP8266mDNS.h> // Include mDNS library
+#include <ESP8266MDNS.h> // Include mDNS library
 #include <ESP8266HTTPClient.h>
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
 
@@ -183,7 +183,7 @@ void saveWeeklySchedulesToSPIFFS() {
     Serial.println("Failed to open weekly_schedules.json for writing");
     return;
   }
-  DynamicJsonDocument doc(2048);
+  DynamicJsonDocument doc(512);
   // Channel 1
   JsonObject ch1 = doc.createNestedObject("ch1");
   ch1["channelName"] = weeklySchedule1.channelName;
@@ -1301,12 +1301,16 @@ void setupWebServer() {
     server.sendContent(chunk);
 
     // Action buttons outside the main form
-    chunk = "<div class='btn-row card-action-row'>";
-    chunk += "<form style='display:inline;'><button type='button' class='btn btn-update' style='min-width:120px;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>";
-    chunk += "<form method='POST' action='/restart' style='display:inline;'><button type='submit' class='btn btn-main'>Restart</button></form>";
-    chunk += "<form method='POST' action='/wifiReset' style='display:inline;'><button type='submit' class='btn btn-danger' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>";
-    chunk += "<form method='POST' action='/factoryReset' style='display:inline;'><button type='submit' class='btn btn-danger' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>";
+    // Each button spans the full width of the card, one per row, with reduced vertical spacing
+    chunk = "<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>";
+    // Restart button with JS handler
+    chunk += "<form id='restartForm' style='width:100%;'><button type='button' id='restartBtn' class='btn btn-main' style='width:100%;margin-bottom:0;' onclick=\"handleRestartClick()\">Restart</button></form>";
+    chunk += "<form method='POST' action='/wifiReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>";
+    chunk += "<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>";
+    chunk += "<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>";
     chunk += "</div>";
+    // JS for restart logic
+    chunk += "<script>\nfunction handleRestartClick() {\n  var btn = document.getElementById('restartBtn');\n  btn.textContent = 'Device restarting... Please wait.';\n  btn.disabled = true;\n  fetch('/restart', { method: 'POST' });\n  setTimeout(function() { window.location.href = '/newUI/summary'; }, 10000);\n}\n</script>";
     server.sendContent(chunk);
 
     // Update CSS for button consistency and centering
@@ -1980,8 +1984,8 @@ void handleSystemSettingsSave() {
   
   // Always save to persist notification settings
   savePersistentDataToSPIFFS();
-  
-  server.send(200, "text/plain", "Settings saved");
+  server.sendHeader("Location", "/newUI/summary");
+  server.send(302, "text/plain", "");
 }
 
 // Helper: Send NTFY notification
