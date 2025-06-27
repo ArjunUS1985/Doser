@@ -1279,14 +1279,15 @@ chunk += F("function saveRename(channel) {\n");
     chunk += F("</div></div></form>"); // Close main form and card
 
     // Action buttons outside the main form
-    // Each button spans the full width of the card, one per row, with reduced vertical spacing
     chunk += F("<div class='btn-row card-action-row' style='flex-direction:column;gap:4px;'>");
-    chunk += F("<form method='POST' action='/restart' style='width:100%;'><button type='submit' class='btn btn-main' style='width:100%;margin-bottom:0;'>Restart</button></form>");
+    chunk += F("<form method='POST' action='/restart' style='width:100%;' onsubmit='return handleRestart(event)'><button id='restartBtn' type='submit' class='btn btn-main' style='width:100%;margin-bottom:0;'>Restart</button></form>");
     chunk += F("<form method='POST' action='/wifiReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Reset WiFi settings? Device will reboot in AP mode.')\">WiFi Reset</button></form>");
     chunk += F("<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>");
     chunk += F("<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>");
-    
     chunk += F("</div>");
+
+    // Add JS for restart button
+    chunk += F("<script>\nfunction handleRestart(e) {\n  var btn = document.getElementById('restartBtn');\n  btn.disabled = true;\n  btn.innerText = 'Restarting..';\n  setTimeout(function() { window.location.href = '/summary'; }, 10000);\n  return true;\n}\n<\/script>");
 
     // Update CSS for button consistency and centering
     chunk += F("<style> ");
