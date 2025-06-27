@@ -147,6 +147,10 @@ bool notifyLowFert = true;
 bool notifyStart = false;
 bool notifyDose = false;
 
+// Calibration status variables
+bool calibratedChannel1 = false;
+bool calibratedChannel2 = false;
+
 // Function Prototypes
 void setupWiFi();
 void setupWebServer();
@@ -632,6 +636,9 @@ void setupWebServer() {
     
     // Generate header
     chunk += generateHeader("Dosing Summary");
+
+    // Warning banner
+   
     
     // Channel 1 Summary
     int daysRemaining1 = 0;
@@ -1366,6 +1373,8 @@ void handleCalibration() {
       float dispensedML = server.arg("dispensedML").toFloat();
       float &calibrationFactor = (channel == 1) ? calibrationFactor1 : calibrationFactor2;
       calibrationFactor = 15000.0 / dispensedML;
+if (channel == 1) calibratedChannel1 = true;
+      if (channel == 2) calibratedChannel2 = true;
       savePersistentDataToSPIFFS();
       // Show toast and redirect to channel management
       String html = F("<html><head><meta http-equiv='refresh' content='2;url=/manageChannel?channel=") + String(channel) + F("'>");
@@ -1588,6 +1597,10 @@ void loadPersistentDataFromSPIFFS() {
   notifyStart = doc["notifyStart"] | false;
   notifyDose = doc["notifyDose"] | false;
 
+  // Load calibration status
+  calibratedChannel1 = doc["calibratedChannel1"] | false;
+  calibratedChannel2 = doc["calibratedChannel2"] | false;
+
   file.close();
   Serial.println(F("Loaded configuration from filesystem"));
 }
@@ -1628,6 +1641,10 @@ void savePersistentDataToSPIFFS() {
   doc["notifyLowFert"] = notifyLowFert;
   doc["notifyStart"] = notifyStart;
   doc["notifyDose"] = notifyDose;
+
+  // Save calibration status
+  doc["calibratedChannel1"] = calibratedChannel1;
+  doc["calibratedChannel2"] = calibratedChannel2;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write JSON to file"));
