@@ -463,6 +463,10 @@ void loop() {
       } else {
         setLEDState(LED_BLINK_RED);
       }
+    } else if (WiFi.status() != WL_CONNECTED && currentLEDState != LED_BLINK_RED) {
+      setLEDState(LED_BLINK_RED);
+    } else if (WiFi.status() == WL_CONNECTED && currentLEDState == LED_BLINK_RED) {
+      setLEDState(LED_BLINK_GREEN);
     }
     // Update LED state
     updateLEDState();
