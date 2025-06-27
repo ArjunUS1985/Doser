@@ -154,6 +154,10 @@ bool calibratedChannel2 = false;
 // Add this global variable
 String lastNotifiedIP = "";
 
+// Add scheduledDoseCompleted flags for each channel
+bool scheduledDoseCompleted1 = false;
+bool scheduledDoseCompleted2 = false;
+
 // Function Prototypes
 void setupWiFi();
 void setupWebServer();
@@ -1604,12 +1608,9 @@ void handleManualDispense() {
     float remML = (channel == 1) ? remainingMLChannel1 : remainingMLChannel2;
     WeeklySchedule* ws = (channel == 1) ? &weeklySchedule1 : &weeklySchedule2;
     int daysLeft = calculateDaysRemaining(remML, ws);
-    if (notifyDose) {
-      String msg = "Dose given on " + chName + ". Remaining: " + String(remML) + "ml, Days left: " + String(daysLeft);
-      sendNtfyNotification("Dose Notification", msg);
-    }
+    
     if (notifyLowFert && daysLeft <= 7) {
-      String msg = "Low fertilizer on " + chName + " Alert";
+      String msg = "Running low on " + chName + " Refill!!";
       sendNtfyNotification("Low Fertilizer Alert", msg);
     }
 
@@ -1619,58 +1620,129 @@ void handleManualDispense() {
   }
 }
 
-void handleDailyDispense() {
-  if (server.hasArg("channel") && server.hasArg("hour") && server.hasArg("minute") && server.hasArg("ml")) {
-    int channel = server.arg("channel").toInt();
-    int hour = server.arg("hour").toInt();
-    int minute = server.arg("minute").toInt();
-    float ml = server.arg("ml").toFloat();
 
-    // Save the updated schedule
-    savePersistentDataToSPIFFS();
-
-    server.send(200, "application/json", F("{\"status\":\"schedule set\"}"));
-  } else {
-    server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
-  }
-}
 
 void checkDailyDispense() {
   timeClient.update();
-  int currentHour = timeClient.getHours();
-  int currentMinute = timeClient.getMinutes();
-  
-  // Track if we need to run either channel
-  bool runCh1 = false;
-  bool runCh2 = false;
-  
-  // If both channels need to run, indicate this with LED
-  if (runCh1 && runCh2) {
-    blinkLED(LED_PURPLE, 2);  // Blink purple twice to indicate dual channel operation
+  int today = (timeClient.getDay() + 6) % 7; // 0=Monday, 6=Sunday
+  int nowHour = timeClient.getHours();
+  int nowMinute = timeClient.getMinutes();
+  time_t epochTime = timeClient.getEpochTime();
+  struct tm *ptm = gmtime((time_t *)&epochTime);
+  int todayYear = ptm->tm_year + 1900;
+  int todayMonth = ptm->tm_mon + 1;
+  int todayDay = ptm->tm_mday;
+  String todayStr = String(todayDay) + "-" + String(todayMonth) + "-" + String(todayYear);
+
+  // Reset scheduledDoseCompleted flags at midnight
+  if (nowHour == 00 && nowMinute == 00) {
+    if (scheduledDoseCompleted1 || scheduledDoseCompleted2) {
+      scheduledDoseCompleted1 = false;
+      scheduledDoseCompleted2 = false;
+      savePersistentDataToSPIFFS();
+    }
   }
-  
-  // Run channel 1 if needed
-  if (runCh1) {
-    updateRemainingML(1, 0);
-   
-    lastDispensedVolume1 = 0;
-    lastDispensedTime1 = getFormattedTime();
-    Serial.print(F("[SCHEDULED DOSE] lastDispensedVolume1 set: ")); Serial.println(lastDispensedVolume1);
-    Serial.print(F("[SCHEDULED DOSE] lastDispensedTime1 set: ")); Serial.println(lastDispensedTime1);
-    savePersistentDataToSPIFFS();
-    Serial.println(F("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 1"));
+
+  // Channel 1
+  bool missed1 = false;
+  if (weeklySchedule1.days[today].enabled) {
+    int schedHour = weeklySchedule1.days[today].hour;
+    int schedMinute = weeklySchedule1.days[today].minute;
+    float dose = weeklySchedule1.days[today].volume;
+    bool timePast = (nowHour > schedHour) || (nowHour == schedHour && nowMinute > schedMinute);
+   // bool notDosedToday = (lastDispensedTime1.indexOf(String(todayYear)) == -1 || lastDispensedTime1.indexOf(String(todayMonth)) == -1 || lastDispensedTime1.indexOf(String(todayDay)) == -1);
+    if (weeklySchedule1.missedDoseCompensation && timePast && !scheduledDoseCompleted1 && dose > 0.0f ) {
+      missed1 = true;
+      int dispenseTime = (int)(dose * calibrationFactor1);
+      runMotor(1, dispenseTime);
+      updateRemainingML(1, dose);
+      lastDispensedVolume1 = dose;
+      lastDispensedTime1 = getFormattedTime();
+      scheduledDoseCompleted1 = true;
+      savePersistentDataToSPIFFS();
+      Serial.print(F("[MISSED DOSE COMPENSATION] Channel 1: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
+      if (notifyDose) {
+        String msg = String(F("Missed scheduled dose given on ")) + channel1Name + F(". Remaining: ") + String(remainingMLChannel1) + F("ml, Days left: ") + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1));
+        sendNtfyNotification(F("Dose Notification"), msg);
+      }
+      if (notifyLowFert && calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1) <= 7) {
+        String msg = String(F("Low fertilizer on ")) + channel1Name + F(" Refill!!");
+        sendNtfyNotification(F("Low Fertilizer Alert"), msg);
+      }
+    }
   }
-  
-  // Run channel 2 if needed
-  if (runCh2) {
-    updateRemainingML(2, 0);
-   
-    lastDispensedVolume2 = 0;
-    lastDispensedTime2 = getFormattedTime();
-    Serial.print(F("[SCHEDULED DOSE] lastDispensedVolume2 set: ")); Serial.println(lastDispensedVolume2);
-    Serial.print(F("[SCHEDULED DOSE] lastDispensedTime2 set: ")); Serial.println(lastDispensedTime2);
-    savePersistentDataToSPIFFS();
-    Serial.println(F("[SCHEDULED DOSE] savePersistentDataToSPIFFS called for channel 2"));
+
+  // Channel 2
+  bool missed2 = false;
+  if (weeklySchedule2.days[today].enabled) {
+    int schedHour = weeklySchedule2.days[today].hour;
+    int schedMinute = weeklySchedule2.days[today].minute;
+    float dose = weeklySchedule2.days[today].volume;
+    bool timePast = (nowHour > schedHour) || (nowHour == schedHour && nowMinute > schedMinute);
+    //bool notDosedToday = (lastDispensedTime2.indexOf(String(todayYear)) == -1 || lastDispensedTime2.indexOf(String(todayMonth)) == -1 || lastDispensedTime2.indexOf(String(todayDay)) == -1);
+    if (weeklySchedule2.missedDoseCompensation && timePast && !scheduledDoseCompleted2 && dose > 0.0f ) {
+      missed2 = true;
+      int dispenseTime = (int)(dose * calibrationFactor2);
+      runMotor(2, dispenseTime);
+      updateRemainingML(2, dose);
+      lastDispensedVolume2 = dose;
+      lastDispensedTime2 = getFormattedTime();
+      scheduledDoseCompleted2 = true;
+      savePersistentDataToSPIFFS();
+      Serial.print(F("[MISSED DOSE COMPENSATION] Channel 2: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
+      if (notifyDose) {
+        String msg = String(F("Missed scheduled dose given on ")) + channel2Name + F(". Remaining: ") + String(remainingMLChannel2) + F("ml, Days left: ") + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2));
+        sendNtfyNotification(F("Dose Notification"), msg);
+      }
+      if (notifyLowFert && calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2) <= 7) {
+        String msg = String(F("Low fertilizer on ")) + channel2Name + F(" Refill!!");
+        sendNtfyNotification(F("Low Fertilizer Alert"), msg);
+      }
+    }
+  }
+
+  // ...existing scheduled dosing logic (do not double dose if missed dose already handled)...
+  if (!missed1 && weeklySchedule1.days[today].enabled && weeklySchedule1.days[today].hour == nowHour && weeklySchedule1.days[today].minute == nowMinute && !scheduledDoseCompleted1) {
+    float dose = weeklySchedule1.days[today].volume;
+    if (dose > 0.0f ) {
+      int dispenseTime = (int)(dose * calibrationFactor1); // ms
+      runMotor(1, dispenseTime);
+      updateRemainingML(1, dose);
+      lastDispensedVolume1 = dose;
+      lastDispensedTime1 = getFormattedTime();
+      scheduledDoseCompleted1 = true;
+      savePersistentDataToSPIFFS();
+      Serial.print(F("[SCHEDULED DOSE] Channel 1: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
+      if (notifyDose) {
+        String msg = String(F("Scheduled dose given on ")) + channel1Name + F(". Remaining: ") + String(remainingMLChannel1) + F("ml, Days left: ") + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1));
+        sendNtfyNotification(F("Dose Notification"), msg);
+      }
+      if (notifyLowFert && calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1) <= 7) {
+        String msg = String(F("Low fertilizer on ")) + channel1Name + F(" Refill!!");
+        sendNtfyNotification(F("Low Fertilizer Alert"), msg);
+      }
+    }
+  }
+  if (!missed2 && weeklySchedule2.days[today].enabled && weeklySchedule2.days[today].hour == nowHour && weeklySchedule2.days[today].minute == nowMinute && !scheduledDoseCompleted2) {
+    float dose = weeklySchedule2.days[today].volume;
+    if (dose > 0.0f ) {
+      int dispenseTime = (int)(dose * calibrationFactor2); // ms
+      runMotor(2, dispenseTime);
+      updateRemainingML(2, dose);
+      lastDispensedVolume2 = dose;
+      lastDispensedTime2 = getFormattedTime();
+      scheduledDoseCompleted2 = true;
+      savePersistentDataToSPIFFS();
+      Serial.print(F("[SCHEDULED DOSE] Channel 2: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
+      if (notifyDose) {
+        String msg = String(F("Scheduled dose given on ")) + channel2Name + F(". Remaining: ") + String(remainingMLChannel2) + F("ml, Days left: ") + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2));
+        sendNtfyNotification(F("Dose Notification"), msg);
+      }
+      if (notifyLowFert && calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2) <= 7) {
+        String msg = String(F("Low fertilizer on ")) + channel2Name + F(" Refill!!");
+        sendNtfyNotification(F("Low Fertilizer Alert"), msg);
+      }
+    }
   }
 }
 
@@ -1747,6 +1819,10 @@ void loadPersistentDataFromSPIFFS() {
   // Load last notified IP (default to empty string)
   lastNotifiedIP = doc["lastNotifiedIP"] | "";
 
+  // Load scheduledDoseCompleted flags
+  scheduledDoseCompleted1 = doc["scheduledDoseCompleted1"] | false;
+  scheduledDoseCompleted2 = doc["scheduledDoseCompleted2"] | false;
+
   file.close();
   Serial.println(F("Loaded configuration from filesystem"));
 }
@@ -1795,6 +1871,10 @@ void savePersistentDataToSPIFFS() {
   // Save last notified IP
   doc["lastNotifiedIP"] = lastNotifiedIP;
 
+  // Save scheduledDoseCompleted flags
+  doc["scheduledDoseCompleted1"] = scheduledDoseCompleted1;
+  doc["scheduledDoseCompleted2"] = scheduledDoseCompleted2;
+
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write JSON to file"));
   }
@@ -1803,23 +1883,7 @@ void savePersistentDataToSPIFFS() {
   Serial.println(F("Saved configuration to filesystem"));
 }
 
-void handleBottleTracking() {
-  if (server.hasArg("channel") && server.hasArg("ml")) {
-    int channel = server.arg("channel").toInt();
-    float ml = server.arg("ml").toFloat();
 
-    if (channel == 1) {
-      remainingMLChannel1 = ml;
-    } else if (channel == 2) {
-      remainingMLChannel2 = ml;
-    }
-
-    savePersistentDataToSPIFFS();
-    server.send(200, "application/json", F("{\"status\":\"bottle updated\"}"));
-  } else {
-    server.send(400, "application/json", F("{\"error\":\"missing parameters\"}"));
-  }
-}
 
 void updateRemainingML(int channel, float dispensedML) {
   if (channel == 1) {
