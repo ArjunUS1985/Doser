@@ -797,7 +797,7 @@ void setupWebServer() {
     chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style></head><body>");
     
     // Generate header
-    chunk += generateHeader("Dosing Summary");
+    chunk += generateHeader("Doser Summary");
 
     // Warning banner
    
