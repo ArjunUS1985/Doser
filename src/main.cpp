@@ -1403,10 +1403,27 @@ chunk += F("function saveRename(channel) {\n");
     }
     
     chunk += F("</select></div>");
-    chunk += F("<div class='form-row'><label for='numChannels'>Number of Channels:</label><select id='numChannels' name='numChannels'>");
-    chunk += F("<option value='1'" ) + String(numChannels == 1 ? F(" selected") : F("")) + F(">1</option>");
-    chunk += F("<option value='2'" ) + String(numChannels == 2 ? F(" selected") : F("")) + F(">2</option>");
+    chunk += F("<div class='form-row'><label for='numChannels'>Number of Channels:</label><select id='numChannels' name='numChannels' onchange='onNumChannelsChange()'>");
+    chunk += F("<option value='1'") + String(numChannels == 1 ? F(" selected") : F("")) + F(">1</option>");
+    chunk += F("<option value='2'") + String(numChannels == 2 ? F(" selected") : F("")) + F(">2</option>");
     chunk += F("</select></div>");
+    // ...existing code...
+    // Add password prompt JS for numChannels
+    chunk += F("<script>\n");
+    chunk += F("var prevNumChannels = ") + String(numChannels) + F(";\n");
+    chunk += F("function onNumChannelsChange() {\n");
+    chunk += F("  var sel = document.getElementById('numChannels');\n");
+    chunk += F("  var newVal = sel.value;\n");
+    chunk += F("  var pwd = prompt('Enter admin password to change number of channels:');\n");
+    chunk += F("  if (pwd === 'admin1985') {\n");
+    chunk += F("    prevNumChannels = newVal;\n");
+    chunk += F("  } else {\n");
+    chunk += F("    alert('Incorrect password. Change reverted.');\n");
+    chunk += F("    sel.value = prevNumChannels;\n");
+    chunk += F("  }\n");
+    chunk += F("}\n");
+    chunk += F("</script>\n");
+    // ...existing code...
     chunk += F("<div class='section-title'>Calibration Factor</div>");
     chunk += F("<div class='form-row'>Channel 1: <span style='font-weight:600;'>") + String(calib1, 2) + F("</span></div>");
     if (numChannels == 2) {
@@ -1467,7 +1484,7 @@ chunk += F("function saveRename(channel) {\n");
     chunk += F("<div class='card'>");
     chunk += F("<h3>FW Update</h3>");
     chunk += F("<div class='form-row'><label for='firmwareUrl'>Firmware URL:</label>");
-    chunk += F("<input type='text' id='firmwareUrl' value='ABC.com/fw.bin' style='width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;'></div>");
+    chunk += F("<input type='text' id='firmwareUrl' value='https://arjunus1985.github.io/Doser/firmware.bin' style='width:100%;padding:10px;font-size:1.1em;border-radius:6px;border:1px solid #ccc;'></div>");
     
     chunk += F("<div class='btn-row'>");
     chunk += F("<button type='button' class='btn btn-update' onclick=\"updateFirmware()\">Update</button>");
