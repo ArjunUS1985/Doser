@@ -1133,7 +1133,7 @@ chunk += F("function saveRename(channel) {\n");
     // Rename UI
     chunk += F("<div id='rename-btn-row' style='display:block;'><button onclick=\"showRenameBox()\">Rename</button></div>");
     chunk += F("<div id='rename-row' class='rename-row' style='display:none;'>");
-    chunk += F("<input id='rename-input' class='rename-input' type='text' value='") + channelName + F("'>");
+    chunk += F("<input id='rename-input' class='rename-input' type='text' value='") + channelName + F("' maxlength='15'>");
     chunk += F("<button class='rename-btn' onclick='saveRename(") + String(channel) + F(")'>Save</button>");
     chunk += F("<button class='rename-btn cancel' onclick='cancelRename()'>Cancel</button>");
    
