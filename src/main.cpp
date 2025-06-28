@@ -125,7 +125,7 @@ String channel1Name = "Channel 1";
 String channel2Name = "Channel 2";
 
 // System Settings Variables
-String deviceName = "Doser";
+String deviceName = "Doser_" + WiFi.macAddress().substring(9, 11); // Default device name with last 2 chars of MAC
 
 // Calibration Variables
 float calibrationFactor1 = 1;
@@ -166,6 +166,12 @@ bool scheduledDoseCompleted2 = false;
 
 // Add global variable for number of channels
 int numChannels = 1; // Default 1
+
+// Add global flags and timer for pending resets
+bool pendingWiFiReset = false;
+bool pendingFactoryReset = false;
+unsigned long resetRequestTime = 0;
+const unsigned long RESET_DELAY_MS = 3500;
 
 // Function Prototypes
 void setupWiFi();
@@ -516,6 +522,24 @@ void loop() {
   // Ensure LED stays purple in AP mode
   if (apModeActive) {
     updateLED(LED_PURPLE);
+  }
+
+  // Handle pending resets after delay
+  if (pendingWiFiReset && millis() - resetRequestTime > RESET_DELAY_MS) {
+    WiFiManager wifiManager;
+    wifiManager.resetSettings();
+    lastNotifiedIP = "";
+    savePersistentDataToSPIFFS();
+    delay(1000);
+    pendingWiFiReset = false;
+    ESP.restart();
+  }
+  if (pendingFactoryReset && millis() - resetRequestTime > RESET_DELAY_MS) {
+    LittleFS.format();
+    WiFiManager wifiManager;
+    wifiManager.resetSettings();
+    pendingFactoryReset = false;
+    ESP.restart();
   }
 
   ArduinoOTA.handle();
@@ -2134,27 +2158,36 @@ void handleRestartOnly() {
 }
 
 void handleWiFiReset() {
-  // Clear WiFiManager credentials
-  WiFiManager wifiManager;
-  wifiManager.resetSettings();
-  
-  // Wipe lastNotifiedIP and save
-  lastNotifiedIP = "";
-  savePersistentDataToSPIFFS();
-  //delay(1000);
-  delay(1000);
-  // Restart ESP to enter AP mode
-  ESP.restart();
+ 
+  String redirectUrl = "http://" + deviceName;
+  redirectUrl.replace(" ", "-");
+  redirectUrl += ".local/";
+  String html = F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Reset</title></head><body style='font-family:Arial,sans-serif;background:#f4f4f9;color:#333;'><div style='max-width:500px;margin:40px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.08);'><h2 style='color:#007BFF;'>WiFi Reset</h2><p>Since you have reset Wifi/System connect to <b>Doser_AP</b> access point from Wifi settings once device led glows purple and proceed with setting up WiFi again. Once WiFi connected click on link below:</p><div style='margin:18px 0;'><a href='");
+  html += redirectUrl;
+  html += F("' style='display:block;padding:14px 0;background:#007BFF;color:#fff;text-align:center;border-radius:6px;font-size:1.1em;text-decoration:none;'>");
+  html += redirectUrl;
+  html += F("</a></div></div></body></html>");
+  server.send(200, "text/html", html);
+  // Set flag and timer for reset in loop
+  pendingWiFiReset = true;
+  resetRequestTime = millis();
 }
 
 void handleFactoryReset() {
-  // Format the entire filesystem to remove all files and orphans
-  LittleFS.format();
-  // Clear WiFiManager credentials
-  WiFiManager wifiManager;
-  wifiManager.resetSettings();
-  // Restart ESP
-  ESP.restart();
+
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  String suffix = mac.substring(9,11);
+  String redirectUrl = "http://doser_" + suffix + ".local/";
+  String html = F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Factory Reset</title></head><body style='font-family:Arial,sans-serif;background:#f4f4f9;color:#333;'><div style='max-width:500px;margin:40px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.08);'><h2 style='color:#dc3545;'>Factory Reset</h2><p>Since you have reset System connect to <b>Doser_AP</b> access point from Wifi settings once device led glows purple and proceed with setting up WiFi again. Once WiFi connected click on link below:</p><div style='margin:18px 0;'><a href='");
+  html += redirectUrl;
+  html += F("' style='display:block;padding:14px 0;background:#007BFF;color:#fff;text-align:center;border-radius:6px;font-size:1.1em;text-decoration:none;'>");
+  html += redirectUrl;
+  html += F("</a></div></div></body></html>");
+  server.send(200, "text/html", html);
+  // Set flag and timer for reset in loop
+  pendingFactoryReset = true;
+  resetRequestTime = millis();
 }
 
 void handleSystemSettingsSave() {
