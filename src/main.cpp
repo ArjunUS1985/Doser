@@ -125,7 +125,8 @@ String channel1Name = "Channel 1";
 String channel2Name = "Channel 2";
 
 // System Settings Variables
-String deviceName = "Doser_" + WiFi.macAddress().substring(9, 11); // Default device name with last 2 chars of MAC
+
+String deviceName; // Default device name with last 2 chars of MAC
 
 // Calibration Variables
 float calibrationFactor1 = 1;
@@ -354,7 +355,9 @@ void setup() {
   // Initialize WS2812B LED
   strip.begin();
   strip.show(); // Ensure all LEDs are off initially
-
+  String mac1 = WiFi.macAddress();
+  mac1.replace(":", ""); // Update to use mac1
+  deviceName = "Doser_" + mac1.substring(9, 11); 
   // Set LED to Red on Startup
   updateLED(LED_RED);
   // Initialize Pins
