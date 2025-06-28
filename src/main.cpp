@@ -136,7 +136,7 @@ float remainingMLChannel1 = 0.0;
 float remainingMLChannel2 = 0.0;
 
 // Add timezone offset to global variables
-int32_t timezoneOffset = 0;  // Default to UTC
+int32_t timezoneOffset = 19800;  // Default to IST (UTC+5:30)
 
 // Add last dispensed volume and time string for each channel
 float lastDispensedVolume1 = 0.0;
@@ -392,7 +392,7 @@ void setup() {
   // Setup Time Sync
   setupTimeSync();
 
-
+  timeClient.setTimeOffset(timezoneOffset); // Ensure NTP client uses IST by default
 
   // Initialize OTA
   setupOTA();
