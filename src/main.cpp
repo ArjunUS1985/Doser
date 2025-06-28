@@ -11,6 +11,7 @@
 #include <LittleFS.h>
 #include <ESP8266mDNS.h> // Include mDNS library
 #include <ESP8266HTTPClient.h>
+#include <Updater.h>
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
 
 // Global variables that getFormattedTime needs
@@ -183,6 +184,7 @@ void handleRestartOnly();
 void handleWiFiReset();
 void handleFactoryReset();
 void handleSystemSettingsSave();
+void handleFirmwareUpdate();
 
 // --- Helper: Day names ---
 const char* dayNames[7] = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
@@ -1421,10 +1423,12 @@ chunk += F("function saveRename(channel) {\n");
     
     chunk += F("<div id='updateProgress' style='margin-top:10px;display:none;'>");
     chunk += F("<div>Downloading firmware...</div>");
-    chunk += F("<div id='progressBar' style='width:100%;background:#ddd;border-radius:6px;margin-top:5px;'>");
-    chunk += F("<div id='progressFill' style='width:0%;height:20px;background:#007BFF;border-radius:6px;transition:width 0.3s;'></div>");
+    chunk += F("<div id='progressBar' style='width:100%;max-width:100%;background:#ddd;border-radius:6px;margin-top:5px;box-sizing:border-box;'>");
+    chunk += F("<div id='progressFill' style='width:0%;max-width:100%;height:20px;background:#007BFF;border-radius:6px;transition:width 0.3s;'></div>");
     chunk += F("</div><div id='progressText'>0%</div></div></div></div>");
-    
+    // Responsive style for progress bar
+    chunk += F("<style>@media (max-width:600px){#progressBar{width:100% !important;max-width:100% !important;}#progressFill{max-width:100% !important;}}</style>");
+
     // JavaScript in smaller chunks
     chunk += F("<script>");
     chunk += F("function showFirmwareUpdate() {");
@@ -1500,6 +1504,12 @@ chunk += F("function saveRename(channel) {\n");
     server.sendHeader("Location", "/summary");
     server.send(302, "text/plain", "");
   });
+
+  server.on("/update", HTTP_POST, []() {
+    server.send(200, "text/plain", F("OK"));
+    delay(100);
+    ESP.restart();
+  }, handleFirmwareUpdate);
 
   server.begin();
 }
@@ -1900,22 +1910,28 @@ void updateRemainingML(int channel, float dispensedML) {
 void setupOTA() {
   ArduinoOTA.setPassword("admin1985");
   ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else { // U_SPIFFS
-      type = "filesystem";
-    }
-    Serial.println(F("Start updating ") + type);
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println(F("\nEnd"));
+    // Start with red
+    updateLED(LED_RED);
+    Serial.println(F("[OTA] Start updating"));
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    float pct = (float)progress / (float)total;
+    if (pct < 0.33) {
+      updateLED(LED_RED);
+    } else if (pct < 0.66) {
+      updateLED(LED_YELLOW);
+    } else {
+      updateLED(LED_GREEN);
+    }
+    Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onEnd([]() {
+    updateLED(LED_GREEN);
+    Serial.println(F("[OTA] End"));
   });
   ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
+    updateLED(LED_RED);
+    Serial.printf("[OTA] Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
       Serial.println(F("Auth Failed"));
     } else if (error == OTA_BEGIN_ERROR) {
@@ -1929,7 +1945,7 @@ void setupOTA() {
     }
   });
   ArduinoOTA.begin();
-  Serial.println(F("OTA Ready"));
+  Serial.println(F("[OTA] Ready for updates"));
 }
 
 void blinkLED(uint32_t color, int times) {
@@ -2167,5 +2183,31 @@ int calculateDaysRemaining(float remainingML, WeeklySchedule* ws) {
     }
   }
   return days;
+}
+
+void handleFirmwareUpdate() {
+    HTTPUpload& upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    Serial.setDebugOutput(true);
+    Serial.printf("[OTA] Update: %s\n", upload.filename.c_str());
+    if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)) {
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+      Update.printError(Serial);
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) {
+      Serial.printf("[OTA] Update Success: %u bytes\nRebooting...\n", upload.totalSize);
+    } else {
+      Update.printError(Serial);
+    }
+    Serial.setDebugOutput(false);
+  } else if (upload.status == UPLOAD_FILE_ABORTED) {
+    Update.end();
+    Serial.println(F("[OTA] Update was aborted"));
+  }
+  yield();
 }
 
