@@ -22,7 +22,7 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 19800, 60000);  // 19800 seconds = 
 String getFormattedTime() {
   timeClient.update();
   time_t epochTime = timeClient.getEpochTime();
-  struct tm *ptm = gmtime ((time_t *)&epochTime);
+  struct tm *ptm = localtime((time_t *)&epochTime); // Use localtime for timezone
   static const char* months[] = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
   int hour = ptm->tm_hour;
   int minute = ptm->tm_min;
@@ -1865,7 +1865,7 @@ void loadPersistentDataFromSPIFFS() {
   // Load remaining ML values
   remainingMLChannel1 = doc["channel1"].as<float>();
   remainingMLChannel2 = doc["channel2"].as<float>();
-  timezoneOffset = doc["timezone"] | 0;  // Default to UTC if not set
+  timezoneOffset = doc["timezone"] | 19800;  // Default to UTC if not set
 
   // Load calibration factors
   calibrationFactor1 = doc["calibration1"] | 1.0f;  // Default to 1 if not set
@@ -2215,7 +2215,7 @@ void handleSystemSettingsSave() {
     int newTimezone = server.arg("timezone").toInt();
     if (newTimezone != timezoneOffset) {
       timezoneOffset = newTimezone;
-      timeClient.setTimeOffset(timezoneOffset);
+      timeClient.setTimeOffset(timezoneOffset); // Ensure NTP client uses new offset immediately
       updated = true;
     }
   }
@@ -2317,8 +2317,8 @@ void handleFirmwareUpdate() {
   } else if (upload.status == UPLOAD_FILE_END) {
     if (Update.end(true)) {
       Serial.printf("[OTA] Update Success: %u bytes\nRebooting...\n", upload.totalSize);
-      updateLED(LED_GREEN); // Set LED to green when done
-      delay(1000); // Show green for 1 second
+   //   updateLED(LED_GREEN); // Set LED to green when done
+   //   delay(1000); // Show green for 1 second
     } else {
       Update.printError(Serial);
     }
