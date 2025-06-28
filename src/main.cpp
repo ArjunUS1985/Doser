@@ -621,9 +621,9 @@ void setupWebServer() {
     chunk += F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
     chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }");
     chunk += F("</style>");
-    
+    server.sendContent(chunk);
     // Send JavaScript
-    chunk += F("<script>\n");
+    chunk = F("<script>\n");
     chunk += F("function startCountdown() {\n");
     chunk += F("  var btn = document.getElementById('calibBtn');\n");
     chunk += F("  var homeBtn = document.getElementById('homeBtn');\n");
@@ -736,9 +736,9 @@ void setupWebServer() {
     
     chunk += F(".prime-btn.stop:hover { background-color: #218838 !important; } ");
     chunk += F(".rename-btn.cancel:hover, button.cancel:hover, .back-btn:hover { background-color: #888 !important; }</style>");
-    
+    server.sendContent(chunk);
     // JavaScript
-    chunk += F("<script>\n");
+    chunk = F("<script>\n");
     chunk += F("function togglePrime() {\n");
     chunk += F("  var btn = document.getElementById('primeButton');\n");
     chunk += F("  var state = btn.getAttribute('data-state') === '1' ? '0' : '1';\n");
@@ -915,9 +915,9 @@ void setupWebServer() {
     
     // Generate footer
     chunk += generateFooter();
-    
+    server.sendContent(chunk);
     // JavaScript
-    chunk += F("<script>\n");
+    chunk = F("<script>\n");
     chunk += F("function showManualDose1() {\n");
     chunk += F("  var s = document.getElementById('manualDoseSection1');\n");
     chunk += F("  s.innerHTML = `<div style='display:flex;gap:8px;align-items:center;justify-content:center;'><input id='doseVol1' type='number' min='0.1' step='0.1' placeholder='Volume (ml)' style='width:40%;padding:8px;font-size:1em;border-radius:6px;border:1px solid #ccc;'><button id='doseBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#007BFF;color:#fff;border:none;border-radius:6px;\" onclick='doseNow1()'>Dose</button><button id='cancelBtn1' style=\"width:25%;padding:10px 0;font-size:1em;background:#aaa;color:#fff;border:none;border-radius:6px;\" onclick='cancelManualDose1()'>Cancel</button></div><div id='doseCountdown1' style='margin-top:8px;font-size:1.1em;color:#007BFF;'></div>`;\n");
@@ -957,8 +957,8 @@ void setupWebServer() {
     chunk += F("  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');\n");
     chunk += F("  xhr.send('channel=1&ml=' + encodeURIComponent(vol));\n");
     chunk += F("}\n");
-    
-    chunk += F("function doseNow2() {\n");
+    server.sendContent(chunk);
+    chunk = F("function doseNow2() {\n");
     chunk += F("  var vol = parseFloat(document.getElementById('doseVol2').value);\n");
     chunk += F("  if (!vol || vol <= 0) { alert('Enter a valid volume'); return; }\n");
     chunk += F("  var btn = document.getElementById('doseBtn2');\n");
@@ -1078,7 +1078,7 @@ chunk += F("function saveRename(channel) {\n");
     
     // Header
     chunk += generateHeader("Channel Management: " + channelName);
-    
+    server.sendContent(chunk);
     // Calculate days remaining for this channel
     int daysRemaining = 0;
     float rem = remainingML;
@@ -1102,7 +1102,7 @@ chunk += F("function saveRename(channel) {\n");
     }
     
     // Status Card
-    chunk += F("<div class='card'>");
+    chunk = F("<div class='card'>");
     chunk += F("<h2>Status</h2>");
     chunk += F("<p>Last Dosed: ") + lastDispensedTime + F("</p>");
     chunk += F("<p>Last Volume: ") + String(lastDispensedVolume) + F(" ml</p>");
@@ -1279,7 +1279,7 @@ chunk += F("function saveRename(channel) {\n");
     chunk += F("});\n");
     chunk += F("</script>\n");
     chunk += F("</head><body>");
-    
+    server.sendContent(chunk);
     // Header and card open
     chunk += generateHeader("Manage Schedule : " + ws->channelName);
     chunk += F("<div class='card' style='margin:20px auto;padding:20px;max-width:500px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1);'>");
@@ -1408,8 +1408,8 @@ chunk += F("function saveRename(channel) {\n");
         chunk += F("<option value='") + String(tzOffsets[j]) + F("'") + (timezoneOffset == tzOffsets[j] ? F(" selected") : F("")) + F(">") + tzLabels[j] + F("</option>");
       }
     }
-    
-    chunk += F("</select></div>");
+    server.sendContent(chunk);
+    chunk = F("</select></div>");
     chunk += F("<div class='form-row'><label for='numChannels'>Number of Channels:</label><select id='numChannels' name='numChannels' onchange='onNumChannelsChange()'>");
     chunk += F("<option value='1'") + String(numChannels == 1 ? F(" selected") : F("")) + F(">1</option>");
     chunk += F("<option value='2'") + String(numChannels == 2 ? F(" selected") : F("")) + F(">2</option>");
