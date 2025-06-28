@@ -1463,9 +1463,9 @@ chunk += F("function saveRename(channel) {\n");
     chunk += F("<form method='POST' action='/factoryReset' style='width:100%;'><button type='submit' class='btn btn-danger' style='width:100%;margin-bottom:0;' onclick=\"return confirm('Factory reset will erase ALL data. Are you sure?')\">Factory Reset</button></form>");
     chunk += F("<form style='width:100%;'><button type='button' class='btn btn-update' style='width:100%;margin-bottom:0;' onclick=\"showFirmwareUpdate()\">FW Update</button></form>");
     chunk += F("</div>");
-
+    server.sendContent(chunk);
     // Add JS for restart button
-    chunk += F("<script>\nfunction handleRestart(e) {\n  var btn = document.getElementById('restartBtn');\n  btn.disabled = true;\n  btn.innerText = 'Restarting..';\n  setTimeout(function() { window.location.href = '/summary'; }, 10000);\n  return true;\n}\n<\/script>");
+    chunk = F("<script>\nfunction handleRestart(e) {\n  var btn = document.getElementById('restartBtn');\n  btn.disabled = true;\n  btn.innerText = 'Restarting..';\n  setTimeout(function() { window.location.href = '/summary'; }, 10000);\n  return true;\n}\n<\/script>");
 
     // Update CSS for button consistency and centering
     chunk += F("<style> ");
