@@ -99,6 +99,10 @@ WeeklySchedule weeklySchedule2;
 int calculateDaysRemaining(float remainingML, WeeklySchedule* ws);
 void sendNtfyNotification(const String& title, const String& message);
 
+// Add a forward declaration for updateDaysRemaining
+template<typename T>
+void updateDaysRemaining(int channel, float remainingML, T* ws);
+
 // Global Variables for LED
 LEDState currentLEDState = LED_OFF;
 unsigned long lastLEDUpdate = 0;
@@ -173,6 +177,10 @@ bool pendingWiFiReset = false;
 bool pendingFactoryReset = false;
 unsigned long resetRequestTime = 0;
 const unsigned long RESET_DELAY_MS = 3500;
+
+// Add global variables for days remaining
+int daysRemainingChannel1 = 0;
+int daysRemainingChannel2 = 0;
 
 // Function Prototypes
 void setupWiFi();
@@ -385,6 +393,10 @@ void setup() {
   Serial.print(F("[BOOT] lastDispensedTime1: ")); Serial.println(lastDispensedTime1);
   Serial.print(F("[BOOT] lastDispensedVolume2: ")); Serial.println(lastDispensedVolume2);
   Serial.print(F("[BOOT] lastDispensedTime2: ")); Serial.println(lastDispensedTime2);
+
+  // Update days remaining at startup for both channels
+  updateDaysRemaining(1, remainingMLChannel1, &weeklySchedule1);
+  updateDaysRemaining(2, remainingMLChannel2, &weeklySchedule2);
 
   // Setup WiFi
   setupWiFiWithRetry();
@@ -810,32 +822,15 @@ void setupWebServer() {
    
     
     // Channel 1 Summary
-    int daysRemaining1 = 0;
-    float rem1 = remainingMLChannel1;
-    int dayIdx1 = (timeClient.getDay() + 6) % 7; // 0=Monday, 6=Sunday
-    int simulatedDays1 = 0;
-    for (int i = 0; i < 365; ++i) { // max 1 year
-      int d = (dayIdx1 + i) % 7;
-      if (weeklySchedule1.days[d].enabled) {
-        float dose = weeklySchedule1.days[d].volume;
-        if (rem1 < dose || dose <= 0.0f) break;
-        rem1 -= dose;
-        daysRemaining1++;
-      }
-      simulatedDays1++;
-    }
-    bool moreThanYear1 = false;
-    if (rem1 > 0.0f && simulatedDays1 == 365) {
-      daysRemaining1 = 366;
-      moreThanYear1 = true;
-    }
+    int daysRemaining1 = daysRemainingChannel1;
+    bool moreThanYear1 = (daysRemaining1 >= 365);
     
     chunk += F("<div class='card'>");
     chunk += F("<h2 style='display:flex;align-items:center;gap:8px;'>") + channel1Name;
     if (!calibratedChannel1) {
       chunk += F("<span class='status-chip chip-running-low'>Not Calibrated</span>");
     }
-    if (!moreThanYear1 && simulatedDays1 <= 7) {
+    if (!moreThanYear1 && daysRemaining1 <= 7) {
       chunk += F("<span class='status-chip chip-running-low'>Running Low</span>");
     }
     chunk += F("</h2>");
@@ -846,8 +841,8 @@ void setupWebServer() {
     if (moreThanYear1) {
       chunk += F("More than a year");
     } else {
-      String daysColor = (simulatedDays1 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
-      chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays1) + F("</span>");
+      String daysColor = (daysRemaining1 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+      chunk += F("<span style='") + daysColor + F("'>") + String(daysRemaining1) + F("</span>");
     }
     chunk += F("</p>");
     
@@ -859,32 +854,15 @@ void setupWebServer() {
     
     // Channel 2 Summary
     if (numChannels == 2) {
-      int daysRemaining2 = 0;
-      float rem2 = remainingMLChannel2;
-      int dayIdx2 = (timeClient.getDay() + 6) % 7;
-      int simulatedDays2 = 0;
-      for (int i = 0; i < 365; ++i) {
-        int d = (dayIdx2 + i) % 7;
-        if (weeklySchedule2.days[d].enabled) {
-          float dose = weeklySchedule2.days[d].volume;
-          if (rem2 < dose || dose <= 0.0f) break;
-          rem2 -= dose;
-          daysRemaining2++;
-        }
-        simulatedDays2++;
-      }
-      bool moreThanYear2 = false;
-      if (rem2 > 0.0f && simulatedDays2 == 365) {
-        daysRemaining2 = 366;
-        moreThanYear2 = true;
-      }
+      int daysRemaining2 = daysRemainingChannel2;
+      bool moreThanYear2 = (daysRemaining2 >= 365);
       
       chunk += F("<div class='card'>");
       chunk += F("<h2 style='display:flex;align-items:center;gap:8px;'>") + channel2Name;
       if (!calibratedChannel2) {
         chunk += F("<span class='status-chip chip-running-low'>Not Calibrated</span>");
       }
-      if (!moreThanYear2 && simulatedDays2 <= 7) {
+      if (!moreThanYear2 && daysRemaining2 <= 7) {
         chunk += F("<span class='status-chip chip-running-low'>Running Low</span>");
       }
       chunk += F("</h2>");
@@ -895,8 +873,8 @@ void setupWebServer() {
       if (moreThanYear2) {
         chunk += F("More than a year");
       } else {
-        String daysColor = (simulatedDays2 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
-        chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays2) + F("</span>");
+        String daysColor = (daysRemaining2 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+        chunk += F("<span style='") + daysColor + F("'>") + String(daysRemaining2) + F("</span>");
       }
       chunk += F("</p>");
       
@@ -996,6 +974,7 @@ void setupWebServer() {
     float lastDispensedVolume = (channel == 1) ? lastDispensedVolume1 : lastDispensedVolume2;
     String lastDispensedTime = (channel == 1) ? lastDispensedTime1 : lastDispensedTime2;
     float remainingML = (channel == 1) ? remainingMLChannel1 : remainingMLChannel2;
+    int daysRemaining = (channel == 1) ? daysRemainingChannel1 : daysRemainingChannel2;
     
     // Start chunked response
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -1080,26 +1059,7 @@ chunk += F("function saveRename(channel) {\n");
     chunk += generateHeader("Channel Management: " + channelName);
     server.sendContent(chunk);
     // Calculate days remaining for this channel
-    int daysRemaining = 0;
-    float rem = remainingML;
-    int dayIdx = (timeClient.getDay() + 6) % 7;
-    int simulatedDays = 0;
-    WeeklySchedule* wsDays = (channel == 1) ? &weeklySchedule1 : &weeklySchedule2;
-    for (int i = 0; i < 365; ++i) {
-      int d = (dayIdx + i) % 7;
-      if (wsDays->days[d].enabled) {
-        float dose = wsDays->days[d].volume;
-        if (rem < dose || dose <= 0.0f) break;
-        rem -= dose;
-        daysRemaining++;
-      }
-      simulatedDays++;
-    }
-    bool moreThanYear = false;
-    if (rem > 0.0f && simulatedDays == 365) {
-      daysRemaining = 366;
-      moreThanYear = true;
-    }
+    bool moreThanYear = (daysRemaining >= 365);
     
     // Status Card
     chunk = F("<div class='card'>");
@@ -1110,8 +1070,8 @@ chunk += F("function saveRename(channel) {\n");
     if (moreThanYear) {
       chunk += F("More than a year");
     } else {
-      String daysColor = (simulatedDays <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
-      chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays) + F(" days</span>");
+      String daysColor = (daysRemaining <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+      chunk += F("<span style='") + daysColor + F("'>") + String(daysRemaining) + F(" days</span>");
     }
     chunk += F(")</span> ");
     
@@ -1219,8 +1179,10 @@ chunk += F("function saveRename(channel) {\n");
       float newVol = server.arg("volume").toFloat();
       if (channel == 1) {
         remainingMLChannel1 = newVol;
+        updateDaysRemaining(1, remainingMLChannel1, &weeklySchedule1);
       } else if (channel == 2) {
         remainingMLChannel2 = newVol;
+        updateDaysRemaining(2, remainingMLChannel2, &weeklySchedule2);
       }
       savePersistentDataToSPIFFS();
       server.send(200, "application/json", F("{\"status\":\"updated\"}"));
@@ -1348,6 +1310,7 @@ chunk += F("function saveRename(channel) {\n");
     }
     ws->missedDoseCompensation = server.hasArg("missedDose");
     saveWeeklySchedulesToSPIFFS();
+    updateDaysRemaining(channel, (channel == 1) ? remainingMLChannel1 : remainingMLChannel2, ws);
     server.sendHeader("Location", "/manageChannel?channel=" + String(channel));
     server.send(302, "text/plain", "");
   });
@@ -1679,6 +1642,7 @@ void handleManualDispense() {
       Serial.print(F("[MANUAL DOSE] lastDispensedVolume2 set: ")); Serial.println(lastDispensedVolume2);
       Serial.print(F("[MANUAL DOSE] lastDispensedTime2 set: ")); Serial.println(lastDispensedTime2);
     }
+    updateDaysRemaining(channel, (channel == 1) ? remainingMLChannel1 : remainingMLChannel2, (channel == 1) ? &weeklySchedule1 : &weeklySchedule2);
     savePersistentDataToSPIFFS();
     Serial.println(F("[MANUAL DOSE] savePersistentDataToSPIFFS called"));
 
@@ -1910,6 +1874,10 @@ void loadPersistentDataFromSPIFFS() {
   // Load number of channels
   numChannels = doc["numChannels"] | 1;
 
+  // Load days remaining
+  daysRemainingChannel1 = doc["daysRemainingChannel1"] | 0;
+  daysRemainingChannel2 = doc["daysRemainingChannel2"] | 0;
+
   file.close();
   Serial.println(F("Loaded configuration from filesystem"));
 }
@@ -1968,6 +1936,10 @@ void savePersistentDataToSPIFFS() {
 
   // Save number of channels
   doc["numChannels"] = numChannels;
+
+  // Save days remaining
+  doc["daysRemainingChannel1"] = daysRemainingChannel1;
+  doc["daysRemainingChannel2"] = daysRemainingChannel2;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write JSON to file"));
@@ -2335,5 +2307,28 @@ void handleFirmwareUpdate() {
     Serial.println(F("[OTA] Update was aborted"));
   }
   yield();
+}
+
+// New function to update days remaining and persist
+template<typename T>
+void updateDaysRemaining(int channel, float remainingML, T* ws) {
+  int days = 0;
+  int dayIdx = (timeClient.getDay() + 6) % 7;
+  float rem = remainingML;
+  for (int i = 0; i < 365; ++i) {
+    int d = (dayIdx + i) % 7;
+    if (ws->days[d].enabled) {
+      float dose = ws->days[d].volume;
+      if (rem < dose || dose <= 0.0f) break;
+      rem -= dose;
+      days++;
+    }
+  }
+  if (channel == 1) {
+    daysRemainingChannel1 = days;
+  } else if (channel == 2) {
+    daysRemainingChannel2 = days;
+  }
+  savePersistentDataToSPIFFS();
 }
 
