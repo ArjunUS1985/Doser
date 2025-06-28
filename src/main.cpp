@@ -2304,7 +2304,7 @@ int calculateDaysRemaining(float remainingML, WeeklySchedule* ws) {
 void handleFirmwareUpdate() {
     HTTPUpload& upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
-    updateLED(LED_PURPLE); // Set LED to purple at start
+    updateLED(LED_BLUE); // Set LED to purple at start
     Serial.setDebugOutput(true);
     Serial.printf("[OTA] Update: %s\n", upload.filename.c_str());
     if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)) {
