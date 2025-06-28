@@ -2162,7 +2162,7 @@ String generateHeader(const String& title) {
 
 String generateFooter() {
   String html = F("<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>");
-  html += F("S/W version : 25.06.01  Support : mymail.arjun@gmail.com");
+  html += F("S/W version : 25.06.01  mymail.arjun@gmail.com");
   html += F("<br>Available RAM: ") + String(ESP.getFreeHeap() / 1024.0, 2) + F(" KB");
   html += F("</div>");
   return html;
