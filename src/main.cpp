@@ -125,7 +125,7 @@ String channel1Name = "Channel 1";
 String channel2Name = "Channel 2";
 
 // System Settings Variables
-String deviceName = "";
+String deviceName = "Doser";
 
 // Calibration Variables
 float calibrationFactor1 = 1;
@@ -163,6 +163,9 @@ String lastNotifiedIP = "";
 // Add scheduledDoseCompleted flags for each channel
 bool scheduledDoseCompleted1 = false;
 bool scheduledDoseCompleted2 = false;
+
+// Add global variable for number of channels
+int numChannels = 1; // Default 1
 
 // Function Prototypes
 void setupWiFi();
@@ -816,52 +819,54 @@ void setupWebServer() {
     chunk += F("</div>");
     
     // Channel 2 Summary
-    int daysRemaining2 = 0;
-    float rem2 = remainingMLChannel2;
-    int dayIdx2 = (timeClient.getDay() + 6) % 7;
-    int simulatedDays2 = 0;
-    for (int i = 0; i < 365; ++i) {
-      int d = (dayIdx2 + i) % 7;
-      if (weeklySchedule2.days[d].enabled) {
-        float dose = weeklySchedule2.days[d].volume;
-        if (rem2 < dose || dose <= 0.0f) break;
-        rem2 -= dose;
-        daysRemaining2++;
+    if (numChannels == 2) {
+      int daysRemaining2 = 0;
+      float rem2 = remainingMLChannel2;
+      int dayIdx2 = (timeClient.getDay() + 6) % 7;
+      int simulatedDays2 = 0;
+      for (int i = 0; i < 365; ++i) {
+        int d = (dayIdx2 + i) % 7;
+        if (weeklySchedule2.days[d].enabled) {
+          float dose = weeklySchedule2.days[d].volume;
+          if (rem2 < dose || dose <= 0.0f) break;
+          rem2 -= dose;
+          daysRemaining2++;
+        }
+        simulatedDays2++;
       }
-      simulatedDays2++;
+      bool moreThanYear2 = false;
+      if (rem2 > 0.0f && simulatedDays2 == 365) {
+        daysRemaining2 = 366;
+        moreThanYear2 = true;
+      }
+      
+      chunk += F("<div class='card'>");
+      chunk += F("<h2 style='display:flex;align-items:center;gap:8px;'>") + channel2Name;
+      if (!calibratedChannel2) {
+        chunk += F("<span class='status-chip chip-running-low'>Not Calibrated</span>");
+      }
+      if (!moreThanYear2 && simulatedDays2 <= 7) {
+        chunk += F("<span class='status-chip chip-running-low'>Running Low</span>");
+      }
+      chunk += F("</h2>");
+      chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
+      chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
+      chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
+      chunk += F("<p>Days Remaining: ");
+      if (moreThanYear2) {
+        chunk += F("More than a year");
+      } else {
+        String daysColor = (simulatedDays2 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
+        chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays2) + F("</span>");
+      }
+      chunk += F("</p>");
+      
+      chunk += F("<div id='manualDoseSection2'>");
+      chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>");
+      chunk += F("</div>");
+      chunk += F("<button onclick=\"location.href='/manageChannel?channel=2'\">Manage Channel 2</button>");
+      chunk += F("</div>");
     }
-    bool moreThanYear2 = false;
-    if (rem2 > 0.0f && simulatedDays2 == 365) {
-      daysRemaining2 = 366;
-      moreThanYear2 = true;
-    }
-    
-    chunk += F("<div class='card'>");
-    chunk += F("<h2 style='display:flex;align-items:center;gap:8px;'>") + channel2Name;
-    if (!calibratedChannel2) {
-      chunk += F("<span class='status-chip chip-running-low'>Not Calibrated</span>");
-    }
-    if (!moreThanYear2 && simulatedDays2 <= 7) {
-      chunk += F("<span class='status-chip chip-running-low'>Running Low</span>");
-    }
-    chunk += F("</h2>");
-    chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
-    chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
-    chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
-    chunk += F("<p>Days Remaining: ");
-    if (moreThanYear2) {
-      chunk += F("More than a year");
-    } else {
-      String daysColor = (simulatedDays2 <= 7) ? F("color:#dc3545;font-weight:bold;") : F("");
-      chunk += F("<span style='") + daysColor + F("'>") + String(simulatedDays2) + F("</span>");
-    }
-    chunk += F("</p>");
-    
-    chunk += F("<div id='manualDoseSection2'>");
-    chunk += F("<button class='card-btn' style='width:100%;padding:12px 0;font-size:1.1em;background:#28a745;color:#fff;border:none;border-radius:6px;margin-bottom:10px;' onclick='showManualDose2()'>Manual Dose</button>");
-    chunk += F("</div>");
-    chunk += F("<button onclick=\"location.href='/manageChannel?channel=2'\">Manage Channel 2</button>");
-    chunk += F("</div>");
     
     // System Time and Actions
     chunk += F("<div class='card'>");
@@ -1366,9 +1371,15 @@ chunk += F("function saveRename(channel) {\n");
     }
     
     chunk += F("</select></div>");
+    chunk += F("<div class='form-row'><label for='numChannels'>Number of Channels:</label><select id='numChannels' name='numChannels'>");
+    chunk += F("<option value='1'" ) + String(numChannels == 1 ? F(" selected") : F("")) + F(">1</option>");
+    chunk += F("<option value='2'" ) + String(numChannels == 2 ? F(" selected") : F("")) + F(">2</option>");
+    chunk += F("</select></div>");
     chunk += F("<div class='section-title'>Calibration Factor</div>");
     chunk += F("<div class='form-row'>Channel 1: <span style='font-weight:600;'>") + String(calib1, 2) + F("</span></div>");
-    chunk += F("<div class='form-row'>Channel 2: <span style='font-weight:600;'>") + String(calib2, 2) + F("</span></div>");
+    if (numChannels == 2) {
+      chunk += F("<div class='form-row'>Channel 2: <span style='font-weight:600;'>") + String(calib2, 2) + F("</span></div>");
+    }
     
     // Notifications section
     chunk += F("<div class='section-title'>Notifications</div>");
@@ -1840,6 +1851,9 @@ void loadPersistentDataFromSPIFFS() {
   ledBrightness = doc["ledBrightness"] | 128;
   blinkAllOk = doc["blinkAllOk"] | true;
 
+  // Load number of channels
+  numChannels = doc["numChannels"] | 1;
+
   file.close();
   Serial.println(F("Loaded configuration from filesystem"));
 }
@@ -1895,6 +1909,9 @@ void savePersistentDataToSPIFFS() {
   // Save LED settings
   doc["ledBrightness"] = ledBrightness;
   doc["blinkAllOk"] = blinkAllOk;
+
+  // Save number of channels
+  doc["numChannels"] = numChannels;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write JSON to file"));
@@ -2177,6 +2194,15 @@ void handleSystemSettingsSave() {
 
   // Save blinkAllOk if provided
   blinkAllOk = server.hasArg("blinkAllOk");
+
+  // Save number of channels if provided
+  if (server.hasArg("numChannels")) {
+    int newNumChannels = server.arg("numChannels").toInt();
+    if (newNumChannels != numChannels && (newNumChannels == 1 || newNumChannels == 2)) {
+      numChannels = newNumChannels;
+      updated = true;
+    }
+  }
 
   // Save other settings here as needed (device name, NTFY settings, etc.)
   
