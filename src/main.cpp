@@ -66,6 +66,10 @@ enum LEDState {
   LED_BLINK_YELLOW
 };
 
+// Add global variables for LED brightness and blink status
+uint8_t ledBrightness = 128; // Default 50% (0-255)
+bool blinkAllOk = true; // Default Yes
+
 // Function prototypes
 void updateLEDState();
 void setLEDState(LEDState state);
@@ -101,6 +105,7 @@ unsigned long lastLEDUpdate = 0;
 int blinkCount = 0;
 
 void updateLED(uint32_t color) {
+  strip.setBrightness(ledBrightness);
   strip.setPixelColor(0, color);
   strip.show();
 }
@@ -972,7 +977,6 @@ void setupWebServer() {
     
     chunk += F(".rename-input { flex:1; padding:8px; font-size:1em; border-radius:6px; border:1px solid #ccc; height: 2.2em; box-sizing: border-box; margin:0; } ");
     chunk += F(".rename-btn { width:25%; padding:10px 0; font-size:1em; border-radius:6px; border:none; background:#007BFF; color:#fff; cursor:pointer; margin:0; transition: background 0.2s; } ");
-    
     chunk += F(".rename-btn.cancel { background:#aaa; transition: background 0.2s; } .rename-btn.cancel:hover { background:#888; } ");
     chunk += F("button.cancel { background:#aaa; transition: background 0.2s; } button.cancel:hover { background:#888; } ");
     
@@ -1377,6 +1381,12 @@ chunk += F("function saveRename(channel) {\n");
     chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyStart' name='notifyStart'") + String(notifyStart ? F(" checked") : F("")) + F("><label for='notifyStart'>System Start</label></div>");
     chunk += F("<div class='checkbox-row'><input type='checkbox' id='notifyDose' name='notifyDose'") + String(notifyDose ? F(" checked") : F("")) + F("><label for='notifyDose'>Dose</label></div>");
     
+    // LED Settings section
+    chunk += F("<div class='section-title'>LED Settings</div>");
+    chunk += F("<div class='form-row'><label for='ledBrightness'>LED Brightness:</label><input type='range' id='ledBrightness' name='ledBrightness' min='0' max='255' value='") + String(ledBrightness) + F("' style='width:100%;'><span id='ledBrightnessValue'>") + String(ledBrightness * 100 / 255) + F("%</span></div>");
+    chunk += F("<div class='form-row'><label for='blinkAllOk'>Blink ALL OK status LED:</label><input type='checkbox' id='blinkAllOk' name='blinkAllOk' value='1' ") + String((blinkAllOk ? F("checked") : F(""))) + F("> <span>Yes</span></div>");
+    chunk += F("<script>document.getElementById('ledBrightness').addEventListener('input',function(){document.getElementById('ledBrightnessValue').innerText=Math.round(this.value*100/255)+'%';});</script>");
+
     // Buttons
     chunk += F("<div class='btn-row'>");
     chunk += F("<button type='submit' class='btn btn-main'>Save</button>");
@@ -1826,6 +1836,10 @@ void loadPersistentDataFromSPIFFS() {
   scheduledDoseCompleted1 = doc["scheduledDoseCompleted1"] | false;
   scheduledDoseCompleted2 = doc["scheduledDoseCompleted2"] | false;
 
+  // Load LED settings
+  ledBrightness = doc["ledBrightness"] | 128;
+  blinkAllOk = doc["blinkAllOk"] | true;
+
   file.close();
   Serial.println(F("Loaded configuration from filesystem"));
 }
@@ -1877,6 +1891,10 @@ void savePersistentDataToSPIFFS() {
   // Save scheduledDoseCompleted flags
   doc["scheduledDoseCompleted1"] = scheduledDoseCompleted1;
   doc["scheduledDoseCompleted2"] = scheduledDoseCompleted2;
+
+  // Save LED settings
+  doc["ledBrightness"] = ledBrightness;
+  doc["blinkAllOk"] = blinkAllOk;
 
   if (serializeJson(doc, file) == 0) {
     Serial.println(F("Failed to write JSON to file"));
@@ -1962,6 +1980,10 @@ void updateLEDState() {
 
   switch (currentLEDState) {
     case LED_BLINK_GREEN:
+      if (!blinkAllOk) {
+        updateLED(0x000000); // Turn off LED if blinkAllOk is false
+        break;
+      }
       if (currentMillis - lastLEDUpdate >= 5000) { // Main cycle every 5 seconds
         lastLEDUpdate = currentMillis;
         updateLED(LED_GREEN);
@@ -2145,6 +2167,16 @@ void handleSystemSettingsSave() {
   if (oldNotifyLowFert != notifyLowFert || oldNotifyStart != notifyStart || oldNotifyDose != notifyDose) {
     updated = true;
   }
+  if (server.hasArg("ledBrightness")) {
+    int newBrightness = server.arg("ledBrightness").toInt();
+    if (newBrightness < 0) newBrightness = 0;
+    if (newBrightness > 255) newBrightness = 255;
+    ledBrightness = (uint8_t)newBrightness;
+    updated = true;
+  }
+
+  // Save blinkAllOk if provided
+  blinkAllOk = server.hasArg("blinkAllOk");
 
   // Save other settings here as needed (device name, NTFY settings, etc.)
   
