@@ -309,6 +309,8 @@ void setupWiFiWithRetry() {
     Serial.println(F("Entered config mode"));
     Serial.println(WiFi.softAPIP());
     Serial.println(myWiFiManager->getConfigPortalSSID());
+    // Set LED to purple when AP mode is entered via callback
+    updateLED(LED_PURPLE);
   });
   wifiManager.setConfigPortalTimeout(300);
   wifiManager.setMinimumSignalQuality(10);
@@ -337,6 +339,7 @@ void setupWiFiWithRetry() {
   Serial.println(F("Failed to connect after retries, entering AP mode."));
   wifiManager.startConfigPortal("Doser_AP");
   apModeActive = true;
+  updateLED(LED_PURPLE); // Set LED to purple when AP mode is entered after retries
 }
 
 void setup() {
@@ -510,6 +513,11 @@ void loop() {
     }
   }
   
+  // Ensure LED stays purple in AP mode
+  if (apModeActive) {
+    updateLED(LED_PURPLE);
+  }
+
   ArduinoOTA.handle();
 }
 
