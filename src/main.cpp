@@ -779,7 +779,7 @@ void setupWebServer() {
     server.send(200, "text/html", "");
     
     // Send HTML header
-    String chunk = F("<html><head><title>Dosing Summary</title>");
+    String chunk = F("<html><head><title>Doser Summary</title>");
     chunk += F("<meta name='viewport' content='width=device-width, initial-scale=1.0'>");
     chunk += F("<style>body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; } ");
     
