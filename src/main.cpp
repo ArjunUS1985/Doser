@@ -477,8 +477,12 @@ void loop() {
   }
 
   // Check Daily Dispense Schedule (only if not priming)
+  static unsigned long lastDailyDispenseCheck = 0;
   if (!isPrimingChannel1 && !isPrimingChannel2) {
-    checkDailyDispense();
+    if (millis() - lastDailyDispenseCheck > 30000) { // 30 seconds
+      lastDailyDispenseCheck = millis();
+      checkDailyDispense();
+    }
   }
 
   // Only update LED state if not priming
