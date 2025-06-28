@@ -805,7 +805,7 @@ void setupWebServer() {
     // Send CSS in chunks
     chunk += F(".card { margin: 20px auto; padding: 20px; max-width: 500px; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); } ");
     chunk += F(".card h2 { margin-top: 0; color: #007BFF; } .card p { margin: 10px 0; } ");
-    chunk += F(".status-chip { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin-left: 8px; } ");
+    chunk += F(".status-chip { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.5em; font-weight: bold; margin-left: 8px; } ");
     chunk += F(".chip-running-low { background: #dc3545; color: #fff; } ");
     
     chunk += F(".card button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; color: #fff; background-color: #007BFF; ");
@@ -835,7 +835,7 @@ void setupWebServer() {
     }
     chunk += F("</h2>");
     chunk += F("<p>Last Dosed Time: ") + lastDispensedTime1 + F("</p>");
-    chunk += F("<p>Last Volume: ") + String(lastDispensedVolume1) + F(" ml</p>");
+    chunk += F("<p>Last Dispensed Volume: ") + String(lastDispensedVolume1) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel1) + F(" ml</p>");
     chunk += F("<p>Days Remaining: ");
     if (moreThanYear1) {
@@ -867,7 +867,7 @@ void setupWebServer() {
       }
       chunk += F("</h2>");
       chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
-      chunk += F("<p>Last Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
+      chunk += F("<p>Last DispensedVolume: ") + String(lastDispensedVolume2) + F(" ml</p>");
       chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
       chunk += F("<p>Days Remaining: ");
       if (moreThanYear2) {
@@ -1065,7 +1065,7 @@ chunk += F("function saveRename(channel) {\n");
     chunk = F("<div class='card'>");
     chunk += F("<h2>Status</h2>");
     chunk += F("<p>Last Dosed: ") + lastDispensedTime + F("</p>");
-    chunk += F("<p>Last Volume: ") + String(lastDispensedVolume) + F(" ml</p>");
+    chunk += F("<p>Last Dispensed Volume: ") + String(lastDispensedVolume) + F(" ml</p>");
     chunk += F("<p>Remaining Volume: <span id='remaining-volume-label'>") + String(remainingML) + F(" ml (");
     if (moreThanYear) {
       chunk += F("More than a year");
@@ -1357,7 +1357,7 @@ chunk += F("function saveRename(channel) {\n");
     // Form start and device settings
     chunk += F("<form method='POST' action='/systemSettings'>");
     chunk += F("<div class='card'>");
-    chunk += F("<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='") + deviceName + F("'></div>");
+    chunk += F("<div class='form-row'><label for='deviceName'>Device Name:</label><input type='text' id='deviceName' name='deviceName' value='") + deviceName + F("' maxlength='15'></div>");
 
     // Timezone dropdown
     chunk += F("<div class='form-row'><label for='timezone'>Time Zone:</label><select name='timezone'>");
@@ -1414,7 +1414,10 @@ chunk += F("function saveRename(channel) {\n");
     // LED Settings section
     chunk += F("<div class='section-title'>LED Settings</div>");
     chunk += F("<div class='form-row'><label for='ledBrightness'>LED Brightness:</label><input type='range' id='ledBrightness' name='ledBrightness' min='0' max='255' value='") + String(ledBrightness) + F("' style='width:100%;'><span id='ledBrightnessValue'>") + String(ledBrightness * 100 / 255) + F("%</span></div>");
-    chunk += F("<div class='form-row'><label for='blinkAllOk'>Blink ALL OK status LED:</label><input type='checkbox' id='blinkAllOk' name='blinkAllOk' value='1' ") + String((blinkAllOk ? F("checked") : F(""))) + F("> <span>Yes</span></div>");
+    chunk += F("<div class='form-row checkbox-row' style='display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:nowrap;'>");
+    chunk += F("<label for='blinkAllOk' style='margin:0;white-space:nowrap;display:inline-block;vertical-align:middle;'>Power ON LED</label>");
+    chunk += F("<input type='checkbox' id='blinkAllOk' name='blinkAllOk' value='1' ") + String((blinkAllOk ? F("checked") : F(""))) + F("> <span>Yes</span>");
+    chunk += F("</div>");
     chunk += F("<script>document.getElementById('ledBrightness').addEventListener('input',function(){document.getElementById('ledBrightnessValue').innerText=Math.round(this.value*100/255)+'%';});</script>");
 
     // Buttons
