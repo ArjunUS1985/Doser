@@ -12,7 +12,24 @@
 #include <ESP8266mDNS.h> // Include mDNS library
 #include <ESP8266HTTPClient.h>
 #include <Updater.h>
+#include <EEPROM.h>
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
+
+#define HW_VERSION_ADDR 0
+#define HW_VERSION_DEFAULT 0.0f
+
+float readHWVersion() {
+  float val = 0.0f;
+  EEPROM.begin(16);
+  EEPROM.get(HW_VERSION_ADDR, val);
+  if (isnan(val) || val <= 0.0f || val > 100.0f) val = HW_VERSION_DEFAULT;
+  return val;
+}
+void writeHWVersion(float version) {
+  EEPROM.begin(16);
+  EEPROM.put(HW_VERSION_ADDR, version);
+  EEPROM.commit();
+}
 
 // Global variables that getFormattedTime needs
 WiFiUDP ntpUDP;
@@ -181,6 +198,9 @@ const unsigned long RESET_DELAY_MS = 3500;
 // Add global variables for days remaining
 int daysRemainingChannel1 = 0;
 int daysRemainingChannel2 = 0;
+
+// Add global variable for calibration time
+int calibrationTimeMs = 5000; // Default to 5 seconds
 
 // Function Prototypes
 void setupWiFi();
@@ -357,6 +377,8 @@ void setupWiFiWithRetry() {
   updateLED(LED_PURPLE); // Set LED to purple when AP mode is entered after retries
 }
 
+float hwVersion = 0.0f; // Global variable for H/W version
+
 void setup() {
   // Initialize Serial
   Serial.begin(9600);
@@ -457,6 +479,17 @@ void setup() {
   Serial.println(F("[BOOT] Time Synced: ") + String(timeSynced));
   Serial.println(F("[BOOT] WiFi Status: ") + String(WiFi.status() == WL_CONNECTED ? F("Connected") : F("Disconnected")));
   Serial.println(F("[BOOT] Notification: ") + String(notifyStart ? F("Enabled") : F("Disabled")));
+  //writeHWVersion(HW_VERSION_DEFAULT);
+  // HW version check/init
+  float hwVer = readHWVersion();
+  hwVersion = hwVer; // Store in global variable for footer
+ 
+  // Set calibration time based on HW version
+  if (hwVer == 1.0f) {
+    calibrationTimeMs = 5000;
+  } else if (hwVer == 0.9f) {
+    calibrationTimeMs = 15000;
+  }
 }
 
 void loop() {
@@ -608,7 +641,7 @@ void setupWebServer() {
     int channel = 1;
     if (server.hasArg("channel")) channel = server.arg("channel").toInt();
     String channelName = (channel == 1) ? channel1Name : channel2Name;
-    
+        
     // Start chunked response
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
     server.send(200, "text/html", "");
@@ -636,19 +669,18 @@ void setupWebServer() {
     server.sendContent(chunk);
     // Send JavaScript
     chunk = F("<script>\n");
+    chunk += F("var calibrationTime = ") + String(calibrationTimeMs / 1000) + F(";\n");
     chunk += F("function startCountdown() {\n");
     chunk += F("  var btn = document.getElementById('calibBtn');\n");
     chunk += F("  var homeBtn = document.getElementById('homeBtn');\n");
     chunk += F("  var backBtn = document.getElementById('backBtn');\n");
     chunk += F("  var countdown = document.getElementById('countdown');\n");
-    
     chunk += F("  btn.disabled = true;\n");
     chunk += F("  homeBtn.disabled = true;\n");
     chunk += F("  backBtn.disabled = true;\n");
-    chunk += F("  var timeLeft = 15;\n");
+    chunk += F("  var timeLeft = calibrationTime;\n");
     chunk += F("  countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n");
     chunk += F("  var interval = setInterval(function() {\n");
-    
     chunk += F("    timeLeft--;\n");
     chunk += F("    countdown.innerText = 'Calibrating... ' + timeLeft + 's remaining';\n");
     chunk += F("    if (timeLeft <= 0) {\n");
@@ -657,20 +689,19 @@ void setupWebServer() {
     chunk += F("      btn.disabled = false;\n");
     chunk += F("      homeBtn.disabled = false;\n");
     chunk += F("      backBtn.disabled = false;\n");
-    
     chunk += F("    }\n");
     chunk += F("  }, 1000);\n");
     chunk += F("}\n");
     chunk += F("function onSubmitCalib(e){\n");
     chunk += F("  startCountdown();\n");
-    chunk += F("}\n");
+        chunk += F("}\n");
     chunk += F("</script>");
     chunk += F("</head><body>");
     chunk += generateHeader("Calibrate: " + channelName);
     chunk += F("<div class='card'>");
-    chunk += F("<div class='calib-warning'>Warning: The motor will run for 15 seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>");
+    chunk += F("<div class='calib-warning'>Warning: The motor will run for ") + String(calibrationTimeMs / 1000) + F(" seconds and dispense liquid. Hold the measuring tube near the dispensing tube before proceeding.</div>");
     chunk += F("<div id='countdown'></div>");
-    chunk += F("<form action='/calibrate?channel=") + String(channel) + F("' method='POST' onsubmit='onSubmitCalib(event)'>");
+        chunk += F("<form action='/calibrate?channel=") + String(channel) + F("' method='POST' onsubmit='onSubmitCalib(event)'>");
     chunk += F("<input type='hidden' name='channel' value='") + String(channel) + F("'>");
     chunk += F("<button type='submit' class='calib-btn' id='calibBtn'>Start Calibration</button>");
     chunk += F("</form>");
@@ -1565,7 +1596,7 @@ void handleCalibration() {
     if (server.hasArg("dispensedML")) {
       float dispensedML = server.arg("dispensedML").toFloat();
       float &calibrationFactor = (channel == 1) ? calibrationFactor1 : calibrationFactor2;
-      calibrationFactor = 15000.0 / dispensedML;
+      calibrationFactor = calibrationTimeMs / dispensedML;
 if (channel == 1) calibratedChannel1 = true;
       if (channel == 2) calibratedChannel2 = true;
       savePersistentDataToSPIFFS();
@@ -1583,8 +1614,8 @@ if (channel == 1) calibratedChannel1 = true;
     
     // First phase - run the motor and show input form
     if (channel == 1 || channel == 2) {
-      // Run motor for exactly 15 seconds
-      runMotor(channel, 15000);
+      // Run motor for calibrationTimeMs
+      runMotor(channel, calibrationTimeMs);
       
       // Show form to input dispensed amount
       String html = F("");
@@ -2139,10 +2170,33 @@ String generateHeader(const String& title) {
   return html;
 }
 
+// Helper function to get WiFi signal strength description
+String getWiFiSignalStrength() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return F("Disconnected");
+  }
+  
+  int32_t rssi = WiFi.RSSI();
+  
+  if (rssi >= -50) {
+    return F("Excellent");
+  } else if (rssi >= -60) {
+    return F("Strong");
+  } else if (rssi >= -70) {
+    return F("Medium");
+  } else if (rssi >= -80) {
+    return F("Low");
+  } else {
+    return F("Poor");
+  }
+}
+
 String generateFooter() {
   String html = F("<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>");
   html += F("S/W version : 25.06.01  mymail.arjun@gmail.com");
+  html += F("<br>H/W version: ") + String(hwVersion, 1);
   html += F("<br>Available RAM: ") + String(ESP.getFreeHeap() / 1024.0, 2) + F(" KB");
+  html += F("<br>WiFi Signal: ") + getWiFiSignalStrength();
   html += F("</div>");
   return html;
 }
