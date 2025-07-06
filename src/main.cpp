@@ -380,6 +380,28 @@ void setupWiFiWithRetry() {
 float hwVersion = 0.0f; // Global variable for H/W version
 
 void setup() {
+  writeHWVersion(1.0f);
+  // Check for factory reset button (D7 pulled low for 5 seconds continuously)
+  pinMode(SYSTEM_RESET_BUTTON_PIN, INPUT_PULLUP);
+  if (digitalRead(SYSTEM_RESET_BUTTON_PIN) == LOW) {
+    unsigned long resetStart = millis();
+    bool stillLow = true;
+    while (millis() - resetStart < 5000) {
+      if (digitalRead(SYSTEM_RESET_BUTTON_PIN) != LOW) {
+        stillLow = false;
+        break;
+      }
+      delay(10); // check every 10ms
+    }
+    if (stillLow) {
+      LittleFS.format();
+      WiFiManager wifiManager;
+      wifiManager.resetSettings();
+      pendingFactoryReset = false;
+      ESP.restart();
+    }
+  }
+
   // Initialize Serial
   Serial.begin(9600);
   // Initialize WS2812B LED
@@ -1086,7 +1108,7 @@ chunk += F("function saveRename(channel) {\n");
     chunk += F("</script>\n");
     chunk += F("</head><body>");
     
-    // Header
+    // Header and card open
     chunk += generateHeader("Channel Management: " + channelName);
     server.sendContent(chunk);
     // Calculate days remaining for this channel
