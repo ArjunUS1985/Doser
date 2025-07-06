@@ -937,7 +937,7 @@ void setupWebServer() {
       }
       chunk += F("</h2>");
       chunk += F("<p>Last Dosed Time: ") + lastDispensedTime2 + F("</p>");
-      chunk += F("<p>Last DispensedVolume: ") + String(lastDispensedVolume2) + F(" ml</p>");
+      chunk += F("<p>Last Dispensed Volume: ") + String(lastDispensedVolume2) + F(" ml</p>");
       chunk += F("<p>Remaining Volume: ") + String(remainingMLChannel2) + F(" ml</p>");
       chunk += F("<p>Days Remaining: ");
       if (moreThanYear2) {
