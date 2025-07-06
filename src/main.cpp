@@ -17,6 +17,8 @@
 
 #define HW_VERSION_ADDR 0
 #define HW_VERSION_DEFAULT 0.0f
+#define CHANNELS_ADDR 4
+#define CHANNELS_DEFAULT 1
 
 float readHWVersion() {
   float val = 0.0f;
@@ -28,6 +30,19 @@ float readHWVersion() {
 void writeHWVersion(float version) {
   EEPROM.begin(16);
   EEPROM.put(HW_VERSION_ADDR, version);
+  EEPROM.commit();
+}
+
+int readChannels() {
+  int val = 0;
+  EEPROM.begin(16);
+  EEPROM.get(CHANNELS_ADDR, val);
+  if (isnan(val) || val < 1 || val > 4) val = CHANNELS_DEFAULT;
+  return val;
+}
+void writeChannels(int channels) {
+  EEPROM.begin(16);
+  EEPROM.put(CHANNELS_ADDR, channels);
   EEPROM.commit();
 }
 
@@ -357,7 +372,7 @@ void setupWiFiWithRetry() {
   wifiRetryStart = millis();
   wifiRetryCount = 0;
   while (wifiRetryCount < WIFI_RETRY_LIMIT) {
-    if (wifiManager.autoConnect("Doser_AP")) {
+    if (wifiManager.autoConnect(deviceName.c_str())) {
       Serial.println(F("Connected to WiFi."));
       Serial.print(F("IP Address: "));
       Serial.println(WiFi.localIP());
@@ -372,7 +387,7 @@ void setupWiFiWithRetry() {
   }
   // If we reach here, go to AP mode and stay
   Serial.println(F("Failed to connect after retries, entering AP mode."));
-  wifiManager.startConfigPortal("Doser_AP");
+  wifiManager.startConfigPortal(deviceName.c_str());
   apModeActive = true;
   updateLED(LED_PURPLE); // Set LED to purple when AP mode is entered after retries
 }
@@ -380,7 +395,9 @@ void setupWiFiWithRetry() {
 float hwVersion = 0.0f; // Global variable for H/W version
 
 void setup() {
-  writeHWVersion(1.0f);
+ // writeHWVersion(1.0f);
+ //writeChannels(2);
+ numChannels = readChannels(); // Read number of channels from EEPROM
   // Check for factory reset button (D7 pulled low for 5 seconds continuously)
   pinMode(SYSTEM_RESET_BUTTON_PIN, INPUT_PULLUP);
   if (digitalRead(SYSTEM_RESET_BUTTON_PIN) == LOW) {
@@ -646,7 +663,7 @@ void setupWiFi() {
   wifiManager.setBreakAfterConfig(true);
 
   // Automatically start configuration portal if no WiFi is configured
-  if (!wifiManager.autoConnect("Doser_AP")) {
+  if (!wifiManager.autoConnect(deviceName.c_str())) {
     Serial.println(F("Failed to connect to WiFi and hit timeout"));
     ESP.restart();
   }
@@ -1424,30 +1441,31 @@ chunk += F("function saveRename(channel) {\n");
         chunk += F("<option value='") + String(tzOffsets[j]) + F("'") + (timezoneOffset == tzOffsets[j] ? F(" selected") : F("")) + F(">") + tzLabels[j] + F("</option>");
       }
     }
-    server.sendContent(chunk);
-    chunk = F("</select></div>");
-    chunk += F("<div class='form-row'><label for='numChannels'>Number of Channels:</label><select id='numChannels' name='numChannels' onchange='onNumChannelsChange()'>");
-    chunk += F("<option value='1'") + String(numChannels == 1 ? F(" selected") : F("")) + F(">1</option>");
-    chunk += F("<option value='2'") + String(numChannels == 2 ? F(" selected") : F("")) + F(">2</option>");
     chunk += F("</select></div>");
-    // ...existing code...
-    // Add password prompt JS for numChannels
-    chunk += F("<script>\n");
-    chunk += F("var prevNumChannels = ") + String(numChannels) + F(";\n");
-    chunk += F("function onNumChannelsChange() {\n");
-    chunk += F("  var sel = document.getElementById('numChannels');\n");
-    chunk += F("  var newVal = sel.value;\n");
-    chunk += F("  var pwd = prompt('Enter admin password to change number of channels:');\n");
-    chunk += F("  if (pwd === 'admin1985') {\n");
-    chunk += F("    prevNumChannels = newVal;\n");
-    chunk += F("  } else {\n");
-    chunk += F("    alert('Incorrect password. Change reverted.');\n");
-    chunk += F("    sel.value = prevNumChannels;\n");
-    chunk += F("  }\n");
-    chunk += F("}\n");
-    chunk += F("</script>\n");
-    // ...existing code...
-    chunk += F("<div class='section-title'>Calibration Factor</div>");
+    server.sendContent(chunk);
+    
+    //chunk += F("<div class='form-row'><label for='numChannels'>Number of Channels:</label><select id='numChannels' name='numChannels' onchange='onNumChannelsChange()'>");
+    //chunk += F("<option value='1'") + String(numChannels == 1 ? F(" selected") : F("")) + F(">1</option>");
+    //chunk += F("<option value='2'") + String(numChannels == 2 ? F(" selected") : F("")) + F(">2</option>");
+    //chunk += F("</select></div>");
+    //// ...existing code...
+    //// Add password prompt JS for numChannels
+    //chunk += F("<script>\n");
+    //chunk += F("var prevNumChannels = ") + String(numChannels) + F(";\n");
+    //chunk += F("function onNumChannelsChange() {\n");
+    //chunk += F("  var sel = document.getElementById('numChannels');\n");
+    //chunk += F("  var newVal = sel.value;\n");
+    //chunk += F("  var pwd = prompt('Enter admin password to change number of channels:');\n");
+    //chunk += F("  if (pwd === 'admin1985') {\n");
+    //chunk += F("    prevNumChannels = newVal;\n");
+    //chunk += F("  } else {\n");
+    //chunk += F("    alert('Incorrect password. Change reverted.');\n");
+    //chunk += F("    sel.value = prevNumChannels;\n");
+    //chunk += F("  }\n");
+    //chunk += F("}\n");
+    //chunk += F("</script>\n");
+    //// ...existing code...
+    chunk = F("<div class='section-title'>Calibration Factor</div>");
     chunk += F("<div class='form-row'>Channel 1: <span style='font-weight:600;'>") + String(calib1, 2) + F("</span></div>");
     if (numChannels == 2) {
       chunk += F("<div class='form-row'>Channel 2: <span style='font-weight:600;'>") + String(calib2, 2) + F("</span></div>");
@@ -1928,7 +1946,7 @@ void loadPersistentDataFromSPIFFS() {
   blinkAllOk = doc["blinkAllOk"] | true;
 
   // Load number of channels
-  numChannels = doc["numChannels"] | 1;
+  //numChannels = doc["numChannels"] | 1;
 
   // Load days remaining
   daysRemainingChannel1 = doc["daysRemainingChannel1"] | 0;
@@ -1991,7 +2009,7 @@ void savePersistentDataToSPIFFS() {
   doc["blinkAllOk"] = blinkAllOk;
 
   // Save number of channels
-  doc["numChannels"] = numChannels;
+  //doc["numChannels"] = numChannels;
 
   // Save days remaining
   doc["daysRemainingChannel1"] = daysRemainingChannel1;
@@ -2215,7 +2233,7 @@ String getWiFiSignalStrength() {
 
 String generateFooter() {
   String html = F("<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>");
-  html += F("S/W version : 25.06.01  mymail.arjun@gmail.com");
+  html += F("S/W version : 25.07.00  mymail.arjun@gmail.com");
   html += F("<br>H/W version: ") + String(hwVersion, 1);
   html += F("<br>Available RAM: ") + String(ESP.getFreeHeap() / 1024.0, 2) + F(" KB");
   html += F("<br>WiFi Signal: ") + getWiFiSignalStrength();
@@ -2237,7 +2255,7 @@ void handleWiFiReset() {
   String redirectUrl = "http://" + deviceName;
   redirectUrl.replace(" ", "-");
   redirectUrl += ".local/";
-  String html = F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Reset</title></head><body style='font-family:Arial,sans-serif;background:#f4f4f9;color:#333;'><div style='max-width:500px;margin:40px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.08);'><h2 style='color:#007BFF;'>WiFi Reset</h2><p>Since you have reset Wifi/System connect to <b>Doser_AP</b> access point from Wifi settings once device led glows purple and proceed with setting up WiFi again. Once WiFi connected click on link below:</p><div style='margin:18px 0;'><a href='");
+  String html = F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>WiFi Reset</title></head><body style='font-family:Arial,sans-serif;background:#f4f4f9;color:#333;'><div style='max-width:500px;margin:40px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.08);'><h2 style='color:#007BFF;'>WiFi Reset</h2><p>Since you have reset Wifi/System connect to <b>")+ deviceName + F("</b> access point from Wifi settings once device led glows purple and proceed with setting up WiFi again. Once WiFi connected click on link below:</p><div style='margin:18px 0;'><a href='");
   html += redirectUrl;
   html += F("' style='display:block;padding:14px 0;background:#007BFF;color:#fff;text-align:center;border-radius:6px;font-size:1.1em;text-decoration:none;'>");
   html += redirectUrl;
@@ -2254,7 +2272,7 @@ void handleFactoryReset() {
   mac.replace(":", "");
   String suffix = mac.substring(9,11);
   String redirectUrl = "http://doser_" + suffix + ".local/";
-  String html = F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Factory Reset</title></head><body style='font-family:Arial,sans-serif;background:#f4f4f9;color:#333;'><div style='max-width:500px;margin:40px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.08);'><h2 style='color:#dc3545;'>Factory Reset</h2><p>Since you have reset System connect to <b>Doser_AP</b> access point from Wifi settings once device led glows purple and proceed with setting up WiFi again. Once WiFi connected click on link below:</p><div style='margin:18px 0;'><a href='");
+  String html = F("<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Factory Reset</title></head><body style='font-family:Arial,sans-serif;background:#f4f4f9;color:#333;'><div style='max-width:500px;margin:40px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.08);'><h2 style='color:#dc3545;'>Factory Reset</h2><p>Since you have reset System connect to <b>")+deviceName+F("</b> access point from Wifi settings once device led glows purple and proceed with setting up WiFi again. Once WiFi connected click on link below:</p><div style='margin:18px 0;'><a href='");
   html += redirectUrl;
   html += F("' style='display:block;padding:14px 0;background:#007BFF;color:#fff;text-align:center;border-radius:6px;font-size:1.1em;text-decoration:none;'>");
   html += redirectUrl;
@@ -2312,13 +2330,13 @@ void handleSystemSettingsSave() {
   blinkAllOk = server.hasArg("blinkAllOk");
 
   // Save number of channels if provided
-  if (server.hasArg("numChannels")) {
-    int newNumChannels = server.arg("numChannels").toInt();
-    if (newNumChannels != numChannels && (newNumChannels == 1 || newNumChannels == 2)) {
-      numChannels = newNumChannels;
-      updated = true;
-    }
-  }
+  //if (server.hasArg("numChannels")) {
+  //  int newNumChannels = server.arg("numChannels").toInt();
+  //  if (newNumChannels != numChannels && (newNumChannels == 1 || newNumChannels == 2)) {
+  //    numChannels = newNumChannels;
+  //    updated = true;
+  //  }
+  //}
 
   // Save other settings here as needed (device name, NTFY settings, etc.)
   
