@@ -396,28 +396,28 @@ float hwVersion = 0.0f; // Global variable for H/W version
 
 void setup() {
  // writeHWVersion(1.0f);
- //writeChannels(2);
+ writeChannels(2);
  numChannels = readChannels(); // Read number of channels from EEPROM
   // Check for factory reset button (D7 pulled low for 5 seconds continuously)
   pinMode(SYSTEM_RESET_BUTTON_PIN, INPUT_PULLUP);
-  if (digitalRead(SYSTEM_RESET_BUTTON_PIN) == LOW) {
-    unsigned long resetStart = millis();
-    bool stillLow = true;
-    while (millis() - resetStart < 5000) {
-      if (digitalRead(SYSTEM_RESET_BUTTON_PIN) != LOW) {
-        stillLow = false;
-        break;
-      }
-      delay(10); // check every 10ms
-    }
-    if (stillLow) {
-      LittleFS.format();
-      WiFiManager wifiManager;
-      wifiManager.resetSettings();
-      pendingFactoryReset = false;
-      ESP.restart();
-    }
-  }
+  //if (digitalRead(SYSTEM_RESET_BUTTON_PIN) == LOW) {
+  //  unsigned long resetStart = millis();
+  //  bool stillLow = true;
+  //  while (millis() - resetStart < 5000) {
+  //    if (digitalRead(SYSTEM_RESET_BUTTON_PIN) != LOW) {
+  //      stillLow = false;
+  //      break;
+  //    }
+  //    delay(10); // check every 10ms
+  //  }
+  //  if (stillLow) {
+  //    LittleFS.format();
+  //    WiFiManager wifiManager;
+  //    wifiManager.resetSettings();
+  //    pendingFactoryReset = false;
+  //    ESP.restart();
+  //  }
+  //}
 
   // Initialize Serial
   Serial.begin(9600);
