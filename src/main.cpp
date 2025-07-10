@@ -237,14 +237,12 @@ void setupWiFi();
 void setupWebServer();
 void handleCalibration();
 void handleManualDispense();
-void handleDailyDispense();
 void updateLED(uint32_t color);
 //void calibrateMotor(int channel, float &calibrationFactor);
 void setupTimeSync();
 void checkDailyDispense();
 void loadPersistentDataFromSPIFFS();
 void savePersistentDataToSPIFFS();
-void handleBottleTracking();
 void updateRemainingML(int channel, float dispensedML);
 
 //void handleSystemReset();
@@ -1945,8 +1943,10 @@ void loadPersistentDataFromSPIFFS() {
   lastNotifiedIP = doc["lastNotifiedIP"] | "";
 
   // Load last scheduled dose timestamps
-  lastScheduledDoseTime1 = doc["lastScheduledDoseTime1"] | 0UL;
-  lastScheduledDoseTime2 = doc["lastScheduledDoseTime2"] | 0UL;
+  unsigned long yesterdayEpoch = timeClient.getEpochTime() - 86400; // 86400 seconds = 1 day
+
+  lastScheduledDoseTime1 = doc["lastScheduledDoseTime1"] | yesterdayEpoch;
+  lastScheduledDoseTime2 = doc["lastScheduledDoseTime2"] | yesterdayEpoch;
 
   // Load LED settings
   ledBrightness = doc["ledBrightness"] | 128;
