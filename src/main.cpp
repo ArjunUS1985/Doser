@@ -116,7 +116,7 @@ enum LEDState {
 // Add global variables for LED brightness and blink status
 uint8_t ledBrightness = 128; // Default 50% (0-255)
 bool blinkAllOk = true; // Default Yes
-
+bool resetButtonPressed = false; // Default No
 // Function prototypes
 void updateLEDState();
 void setLEDState(LEDState state);
@@ -409,7 +409,7 @@ float hwVersion = 0.0f; // Global variable for H/W version
 
 void setup() {
  // writeHWVersion(1.0f);
- writeChannels(2);
+ //writeChannels(2);
  numChannels = readChannels(); // Read number of channels from EEPROM
   // Check for factory reset button (D7 pulled low for 5 seconds continuously)
   pinMode(SYSTEM_RESET_BUTTON_PIN, INPUT_PULLUP);
@@ -424,11 +424,14 @@ void setup() {
       delay(10); // check every 10ms
     }
     if (stillLow) {
-      LittleFS.format();
-      WiFiManager wifiManager;
-      wifiManager.resetSettings();
-      pendingFactoryReset = false;
-      ESP.restart();
+     // LittleFS.format();
+      //WiFiManager wifiManager;
+      //wifiManager.resetSettings();
+      //pendingFactoryReset = false;
+      //ESP.restart();
+      //set global boolean var reset button pressed 
+      resetButtonPressed = true;
+      
     }
   }
  // Initialize Serial
@@ -505,7 +508,8 @@ void setup() {
     msg += "\n";
     msg += "Device: " + deviceName + "\n";
     msg += channel1Name + ": " + String(remainingMLChannel1) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1)) + "\n";
-    msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2));
+    msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2)) + "\n";
+    msg += resetButtonPressed ? "D7:Y" : "D7:N";
     Serial.println(F("Sending System Start notification: ") + msg);
     sendNtfyNotification(deviceName+" Start", msg);
   }
@@ -2240,7 +2244,7 @@ String getWiFiSignalStrength() {
 
 String generateFooter() {
   String html = F("<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>");
-  html += F("S/W version : 25.07.01  mymail.arjun@gmail.com");
+  html += F("S/W version : 25.07.10  mymail.arjun@gmail.com");
   html += F("<br>H/W version: ") + String(hwVersion, 1);
   html += F("<br>Available RAM: ") + String(ESP.getFreeHeap() / 1024.0, 2) + F(" KB");
   html += F("<br>WiFi Signal: ") + getWiFiSignalStrength();
