@@ -69,6 +69,21 @@ String getFormattedTime() {
   return String(timeString);
 }
 
+// Helper function to check if a timestamp is from today
+bool isToday(unsigned long timestamp) {
+  if (timestamp == 0) return false; // Never dosed
+  
+  timeClient.update();
+  time_t now = timeClient.getEpochTime();
+  struct tm *nowTm = gmtime(&now);
+  time_t timestampTime = timestamp;
+  struct tm *timestampTm = gmtime(&timestampTime);
+  
+  return (nowTm->tm_year == timestampTm->tm_year && 
+          nowTm->tm_mon == timestampTm->tm_mon && 
+          nowTm->tm_mday == timestampTm->tm_mday);
+}
+
 // Pin Definitions
 #define MOTOR1_PIN D1
 #define MOTOR2_PIN D5
@@ -197,9 +212,9 @@ bool calibratedChannel2 = false;
 // Add this global variable
 String lastNotifiedIP = "";
 
-// Add scheduledDoseCompleted flags for each channel
-bool scheduledDoseCompleted1 = false;
-bool scheduledDoseCompleted2 = false;
+// Add last scheduled dose timestamps for each channel (epoch time)
+unsigned long lastScheduledDoseTime1 = 0;
+unsigned long lastScheduledDoseTime2 = 0;
 
 // Add global variable for number of channels
 int numChannels = 1; // Default 1
@@ -1751,14 +1766,7 @@ void checkDailyDispense() {
   int todayDay = ptm->tm_mday;
   String todayStr = String(todayDay) + "-" + String(todayMonth) + "-" + String(todayYear);
 
-  // Reset scheduledDoseCompleted flags at midnight
-  if (nowHour == 00 && nowMinute == 00) {
-    if (scheduledDoseCompleted1 || scheduledDoseCompleted2) {
-      scheduledDoseCompleted1 = false;
-      scheduledDoseCompleted2 = false;
-      savePersistentDataToSPIFFS();
-    }
-  }
+  // Reset scheduledDoseCompleted flags at midnight - REMOVED: No longer needed with timestamp approach
 
   // Channel 1
   bool missed1 = false;
@@ -1768,14 +1776,14 @@ void checkDailyDispense() {
     float dose = weeklySchedule1.days[today].volume;
     bool timePast = (nowHour > schedHour) || (nowHour == schedHour && nowMinute > schedMinute);
    // bool notDosedToday = (lastDispensedTime1.indexOf(String(todayYear)) == -1 || lastDispensedTime1.indexOf(String(todayMonth)) == -1 || lastDispensedTime1.indexOf(String(todayDay)) == -1);
-    if (weeklySchedule1.missedDoseCompensation && timePast && !scheduledDoseCompleted1 && dose > 0.0f ) {
+    if (weeklySchedule1.missedDoseCompensation && timePast && !isToday(lastScheduledDoseTime1) && dose > 0.0f ) {
       missed1 = true;
       int dispenseTime = (int)(dose * calibrationFactor1);
       runMotor(1, dispenseTime);
       updateRemainingML(1, dose);
       lastDispensedVolume1 = dose;
       lastDispensedTime1 = getFormattedTime();
-      scheduledDoseCompleted1 = true;
+      lastScheduledDoseTime1 = timeClient.getEpochTime();
       savePersistentDataToSPIFFS();
       Serial.print(F("[MISSED DOSE COMPENSATION] Channel 1: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
       if (notifyDose) {
@@ -1797,14 +1805,14 @@ void checkDailyDispense() {
     float dose = weeklySchedule2.days[today].volume;
     bool timePast = (nowHour > schedHour) || (nowHour == schedHour && nowMinute > schedMinute);
     //bool notDosedToday = (lastDispensedTime2.indexOf(String(todayYear)) == -1 || lastDispensedTime2.indexOf(String(todayMonth)) == -1 || lastDispensedTime2.indexOf(String(todayDay)) == -1);
-    if (weeklySchedule2.missedDoseCompensation && timePast && !scheduledDoseCompleted2 && dose > 0.0f ) {
+    if (weeklySchedule2.missedDoseCompensation && timePast && !isToday(lastScheduledDoseTime2) && dose > 0.0f ) {
       missed2 = true;
       int dispenseTime = (int)(dose * calibrationFactor2);
       runMotor(2, dispenseTime);
       updateRemainingML(2, dose);
       lastDispensedVolume2 = dose;
       lastDispensedTime2 = getFormattedTime();
-      scheduledDoseCompleted2 = true;
+      lastScheduledDoseTime2 = timeClient.getEpochTime();
       savePersistentDataToSPIFFS();
       Serial.print(F("[MISSED DOSE COMPENSATION] Channel 2: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
       if (notifyDose) {
@@ -1819,7 +1827,7 @@ void checkDailyDispense() {
   }
 
   // ...existing scheduled dosing logic (do not double dose if missed dose already handled)...
-  if (!missed1 && weeklySchedule1.days[today].enabled && weeklySchedule1.days[today].hour == nowHour && weeklySchedule1.days[today].minute == nowMinute && !scheduledDoseCompleted1) {
+  if (!missed1 && weeklySchedule1.days[today].enabled && weeklySchedule1.days[today].hour == nowHour && weeklySchedule1.days[today].minute == nowMinute && !isToday(lastScheduledDoseTime1)) {
     float dose = weeklySchedule1.days[today].volume;
     if (dose > 0.0f ) {
       int dispenseTime = (int)(dose * calibrationFactor1); // ms
@@ -1827,7 +1835,7 @@ void checkDailyDispense() {
       updateRemainingML(1, dose);
       lastDispensedVolume1 = dose;
       lastDispensedTime1 = getFormattedTime();
-      scheduledDoseCompleted1 = true;
+      lastScheduledDoseTime1 = timeClient.getEpochTime();
       savePersistentDataToSPIFFS();
       Serial.print(F("[SCHEDULED DOSE] Channel 1: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
       if (notifyDose) {
@@ -1840,7 +1848,7 @@ void checkDailyDispense() {
       }
     }
   }
-  if (!missed2 && weeklySchedule2.days[today].enabled && weeklySchedule2.days[today].hour == nowHour && weeklySchedule2.days[today].minute == nowMinute && !scheduledDoseCompleted2) {
+  if (!missed2 && weeklySchedule2.days[today].enabled && weeklySchedule2.days[today].hour == nowHour && weeklySchedule2.days[today].minute == nowMinute && !isToday(lastScheduledDoseTime2)) {
     float dose = weeklySchedule2.days[today].volume;
     if (dose > 0.0f ) {
       int dispenseTime = (int)(dose * calibrationFactor2); // ms
@@ -1848,7 +1856,7 @@ void checkDailyDispense() {
       updateRemainingML(2, dose);
       lastDispensedVolume2 = dose;
       lastDispensedTime2 = getFormattedTime();
-      scheduledDoseCompleted2 = true;
+      lastScheduledDoseTime2 = timeClient.getEpochTime();
       savePersistentDataToSPIFFS();
       Serial.print(F("[SCHEDULED DOSE] Channel 2: Dispensed ")); Serial.print(dose); Serial.println(F(" ml"));
       if (notifyDose) {
@@ -1936,9 +1944,9 @@ void loadPersistentDataFromSPIFFS() {
   // Load last notified IP (default to empty string)
   lastNotifiedIP = doc["lastNotifiedIP"] | "";
 
-  // Load scheduledDoseCompleted flags
-  scheduledDoseCompleted1 = doc["scheduledDoseCompleted1"] | false;
-  scheduledDoseCompleted2 = doc["scheduledDoseCompleted2"] | false;
+  // Load last scheduled dose timestamps
+  lastScheduledDoseTime1 = doc["lastScheduledDoseTime1"] | 0UL;
+  lastScheduledDoseTime2 = doc["lastScheduledDoseTime2"] | 0UL;
 
   // Load LED settings
   ledBrightness = doc["ledBrightness"] | 128;
@@ -1999,9 +2007,9 @@ void savePersistentDataToSPIFFS() {
   // Save last notified IP
   doc["lastNotifiedIP"] = lastNotifiedIP;
 
-  // Save scheduledDoseCompleted flags
-  doc["scheduledDoseCompleted1"] = scheduledDoseCompleted1;
-  doc["scheduledDoseCompleted2"] = scheduledDoseCompleted2;
+  // Save last scheduled dose timestamps
+  doc["lastScheduledDoseTime1"] = lastScheduledDoseTime1;
+  doc["lastScheduledDoseTime2"] = lastScheduledDoseTime2;
 
   // Save LED settings
   doc["ledBrightness"] = ledBrightness;
