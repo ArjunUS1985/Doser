@@ -59,7 +59,7 @@ void writeChannels(int channels) {
 // Global variables that getFormattedTime needs
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 19800, 60000);  // 19800 seconds = 5.5 hours for IST
-
+const unsigned long jan1_2025_epoch = 1735689600; // Epoch time for Jan 1, 2025
 // Time formatting function
 String getFormattedTime() {
   timeClient.update();
@@ -1818,7 +1818,7 @@ void checkDailyDispense() {
     float dose = weeklySchedule1.days[today].volume;
     bool timePast = (nowHour > schedHour) || (nowHour == schedHour && nowMinute > schedMinute);
    // bool notDosedToday = (lastDispensedTime1.indexOf(String(todayYear)) == -1 || lastDispensedTime1.indexOf(String(todayMonth)) == -1 || lastDispensedTime1.indexOf(String(todayDay)) == -1);
-    if (weeklySchedule1.missedDoseCompensation && timePast && !isToday(lastScheduledDoseTime1) && dose > 0.0f ) {
+    if (weeklySchedule1.missedDoseCompensation && timePast && !isToday(lastScheduledDoseTime1) && dose > 0.0f && lastScheduledDoseTime1 != jan1_2025_epoch) {
       missed1 = true;
       int dispenseTime = (int)(dose * calibrationFactor1);
       runMotor(1, dispenseTime);
@@ -1847,7 +1847,7 @@ void checkDailyDispense() {
     float dose = weeklySchedule2.days[today].volume;
     bool timePast = (nowHour > schedHour) || (nowHour == schedHour && nowMinute > schedMinute);
     //bool notDosedToday = (lastDispensedTime2.indexOf(String(todayYear)) == -1 || lastDispensedTime2.indexOf(String(todayMonth)) == -1 || lastDispensedTime2.indexOf(String(todayDay)) == -1);
-    if (weeklySchedule2.missedDoseCompensation && timePast && !isToday(lastScheduledDoseTime2) && dose > 0.0f ) {
+    if (weeklySchedule2.missedDoseCompensation && timePast && !isToday(lastScheduledDoseTime2) && dose > 0.0f && lastScheduledDoseTime2 != jan1_2025_epoch) {
       missed2 = true;
       int dispenseTime = (int)(dose * calibrationFactor2);
       runMotor(2, dispenseTime);
@@ -1988,7 +1988,7 @@ void loadPersistentDataFromSPIFFS() {
 
   // Load last scheduled dose timestamps
   //create a variable to hold the epoch of Jan1 2025
-  const unsigned long jan1_2025_epoch = 1735689600; // Epoch time for Jan 1, 2025
+  
 
   lastScheduledDoseTime1 = doc["lastScheduledDoseTime1"] | jan1_2025_epoch; // Default to 0 if not set
   lastScheduledDoseTime2 = doc["lastScheduledDoseTime2"] | jan1_2025_epoch;
@@ -2285,7 +2285,7 @@ String getWiFiSignalStrength() {
 
 String generateFooter() {
   String html = F("<div style='width:100%;background:#f1f1f1;color:#333;padding:10px 0;text-align:center;font-size:1em;border-radius:0 0 10px 10px;box-shadow:0 -2px 4px rgba(0,0,0,0.03);margin-top:20px;'>");
-  html += F("S/W version : 25.07.11  mymail.arjun@gmail.com");
+  html += F("S/W version : 25.07.12  mymail.arjun@gmail.com");
   html += F("<br>H/W version: ") + String(hwVersion, 1);
   html += F("<br>Available RAM: ") + String(ESP.getFreeHeap() / 1024.0, 2) + F(" KB");
   html += F("<br>WiFi Signal: ") + getWiFiSignalStrength();
