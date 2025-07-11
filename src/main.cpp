@@ -15,6 +15,16 @@
 #include <EEPROM.h>
 #define SPIFFS LittleFS // Replace SPIFFS with LittleFS for compatibility
 
+// Telnet server globals
+//WiFiServer telnetServer(23);
+WiFiClient telnetClient;
+
+void telnetPrint(const String& msg) {
+  if (telnetClient && telnetClient.connected()) {
+    telnetClient.print(msg);
+  }
+}
+
 #define HW_VERSION_ADDR 0
 #define HW_VERSION_DEFAULT 0.0f
 #define CHANNELS_ADDR 4
@@ -72,16 +82,24 @@ String getFormattedTime() {
 // Helper function to check if a timestamp is from today
 bool isToday(unsigned long timestamp) {
   if (timestamp == 0) return false; // Never dosed
-  
   timeClient.update();
   time_t now = timeClient.getEpochTime();
+  //telnetPrint("[isToday] now epoch: " + String((long)now) + "\r\n");
+  struct tm nowTmCopy;
   struct tm *nowTm = gmtime(&now);
+  if (nowTm) nowTmCopy = *nowTm;
   time_t timestampTime = timestamp;
+  struct tm timestampTmCopy;
   struct tm *timestampTm = gmtime(&timestampTime);
-  
-  return (nowTm->tm_year == timestampTm->tm_year && 
-          nowTm->tm_mon == timestampTm->tm_mon && 
-          nowTm->tm_mday == timestampTm->tm_mday);
+  if (timestampTm) timestampTmCopy = *timestampTm;
+  // telnetPrint("[isToday] nowTm: year=" + String(nowTmCopy.tm_year+1900) + ", mon=" + String(nowTmCopy.tm_mon+1) + ", mday=" + String(nowTmCopy.tm_mday) + "\r\n");
+  // telnetPrint("[isToday] timestamp: " + String((long)timestamp) + "\r\n");
+  //telnetPrint("[isToday] timestampTm: year=" + String(timestampTmCopy.tm_year+1900) + ", mon=" + String(timestampTmCopy.tm_mon+1) + ", mday=" + String(timestampTmCopy.tm_mday) + "\r\n");
+  bool sameDay = (nowTmCopy.tm_year == timestampTmCopy.tm_year && 
+          nowTmCopy.tm_mon == timestampTmCopy.tm_mon && 
+          nowTmCopy.tm_mday == timestampTmCopy.tm_mday);
+  //telnetPrint("[isToday] sameDay: " + String(sameDay ? "true" : "false") + "\r\n");
+  return sameDay;
 }
 
 // Pin Definitions
@@ -509,7 +527,9 @@ void setup() {
     msg += "Device: " + deviceName + "\n";
     msg += channel1Name + ": " + String(remainingMLChannel1) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1)) + "\n";
     msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2)) + "\n";
-    msg += resetButtonPressed ? "D7:Y" : "D7:N";
+    msg += resetButtonPressed ? "D7:Y" : "D7:N \n";
+    msg += "CH1:" + String(lastScheduledDoseTime1) + "\n";
+    msg += "CH2:" + String(lastScheduledDoseTime2) + "\n";
     Serial.println(F("Sending System Start notification: ") + msg);
     sendNtfyNotification(deviceName+" Start", msg);
   }
@@ -545,14 +565,31 @@ void setup() {
   } else if (hwVer == 0.9f) {
     calibrationTimeMs = 15000;
   }
+
+  // Start Telnet server
+  //telnetServer.begin();
+  //telnetServer.setNoDelay(true);
 }
 
 void loop() {
   // Handle Web Server
   server.handleClient();
 
-
-
+  // Telnet client connection management
+ // if (telnetServer.hasClient()) {
+ //   if (!telnetClient || !telnetClient.connected()) {
+ //     telnetClient = telnetServer.available();
+ //     telnetPrint(F("Telnet connected!\r\n"));
+ //   } else {
+ //     // Only allow one client
+ //     WiFiClient newClient = telnetServer.available();
+ //     newClient.println(F("Another Telnet client is already connected."));
+ //     newClient.stop();
+ //   }
+ // }
+ // if (telnetClient && !telnetClient.connected()) {
+ //   telnetClient.stop();
+ // }
 
   // Handle OTA
   ArduinoOTA.handle();
@@ -1947,12 +1984,13 @@ void loadPersistentDataFromSPIFFS() {
   lastNotifiedIP = doc["lastNotifiedIP"] | "";
 
   // Load last scheduled dose timestamps
-  unsigned long yesterdayEpoch = timeClient.getEpochTime() - 86400; // 86400 seconds = 1 day
+  //create a variable to hold the epoch of Jan1 2025
+  const unsigned long jan1_2025_epoch = 1735689600; // Epoch time for Jan 1, 2025
 
-  lastScheduledDoseTime1 = doc["lastScheduledDoseTime1"] | yesterdayEpoch;
-  lastScheduledDoseTime2 = doc["lastScheduledDoseTime2"] | yesterdayEpoch;
-
-  // Load LED settings
+  lastScheduledDoseTime1 = doc["lastScheduledDoseTime1"] | jan1_2025_epoch; // Default to 0 if not set
+  lastScheduledDoseTime2 = doc["lastScheduledDoseTime2"] | jan1_2025_epoch;
+  
+    // Load LED settings
   ledBrightness = doc["ledBrightness"] | 128;
   blinkAllOk = doc["blinkAllOk"] | true;
 
