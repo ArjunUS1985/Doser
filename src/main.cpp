@@ -528,8 +528,7 @@ void setup() {
     msg += channel1Name + ": " + String(remainingMLChannel1) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel1, &weeklySchedule1)) + "\n";
     msg += channel2Name + ": " + String(remainingMLChannel2) + "ml, Days: " + String(calculateDaysRemaining(remainingMLChannel2, &weeklySchedule2)) + "\n";
     msg += resetButtonPressed ? "D7:Y" : "D7:N \n";
-    msg += "CH1:" + String(lastScheduledDoseTime1) + "\n";
-    msg += "CH2:" + String(lastScheduledDoseTime2) + "\n";
+  
     Serial.println(F("Sending System Start notification: ") + msg);
     sendNtfyNotification(deviceName+" Start", msg);
   }
@@ -1432,10 +1431,14 @@ chunk += F("function saveRename(channel) {\n");
       ws->days[i].volume = server.arg("vol" + String(i)).toFloat();
     }
     ws->missedDoseCompensation = server.hasArg("missedDose");
-    saveWeeklySchedulesToSPIFFS();
-    updateDaysRemaining(channel, (channel == 1) ? remainingMLChannel1 : remainingMLChannel2, ws);
+    
+    // Send response early for better user experience
     server.sendHeader("Location", "/manageChannel?channel=" + String(channel));
     server.send(302, "text/plain", "");
+    
+    // File I/O operations after response
+    saveWeeklySchedulesToSPIFFS();
+    updateDaysRemaining(channel, (channel == 1) ? remainingMLChannel1 : remainingMLChannel2, ws);
   });
 
   server.on("/systemSettings", HTTP_GET, []() {
